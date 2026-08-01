@@ -85,7 +85,7 @@ export default function Home() {
         </p>
 
         <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-          <Link to="/complaint" className="btn btn-primary" style={{ padding: "14px 32px", fontSize: "1.05rem" }}>
+          <Link to="/complaint?category=flood" className="btn btn-primary" style={{ padding: "14px 32px", fontSize: "1.05rem" }}>
             📢 {t("home_report_btn")}
           </Link>
           <Link to="/dashboard" className="btn btn-secondary" style={{ padding: "14px 28px", fontSize: "1.05rem" }}>
@@ -150,7 +150,7 @@ export default function Home() {
                 </p>
               </div>
               <Link
-                to="/complaint"
+                to={`/complaint?category=${cat.id}`}
                 className="btn btn-secondary"
                 style={{ fontSize: "0.83rem", padding: "8px 12px", width: "100%", justifyContent: "space-between" }}
               >

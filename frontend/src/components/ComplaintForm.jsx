@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../services/api";
 
 const ISSUE_CATEGORIES = [
@@ -57,15 +57,51 @@ const ISSUE_CATEGORIES = [
 
 export default function ComplaintForm() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const queryCat = searchParams.get("category");
+  const initialCategory = ISSUE_CATEGORIES.some((c) => c.id === queryCat) ? queryCat : "flood";
 
   const [form, setForm] = useState({
-    category: "flood",
+    category: initialCategory,
     name: "",
     phone: "",
     district: "",
     city: "",
     area: "",
     description: ""
+  });
+
+  const [categoryDetails, setCategoryDetails] = useState({
+    // Flood
+    floodDepth: "Knee Deep (1 - 2 ft)",
+    drainageStatus: "Blocked Storm Drain / Drain Grate",
+    affectedImpact: "Residential Houses & Yard Areas",
+    waterEntering: "Yes - Ground Floor Inundated",
+
+    // Garbage
+    wasteType: "Household Organic & Food Waste",
+    dumpsterStatus: "Overflowing Municipal Trash Bin",
+    accumulationDuration: "3 - 5 Days",
+    healthHazard: "Severe Foul Odor & Pest Infestation (Flies/Rats)",
+
+    // Road Damage
+    damageType: "Deep Pothole / Crater",
+    potholeSize: "Medium (1 - 3 feet wide)",
+    roadClass: "Main Arterial Road / Expressway",
+    hazardLevel: "Extreme Hazard for Motorcycles / Bicycles",
+
+    // Power Failure
+    outageScope: "Entire Street / Neighborhood Block",
+    outageSymptom: "Total Power Blackout (No Supply)",
+    criticalDanger: "No Immediate Wire Hazard",
+    outageDuration: "1 - 3 Hours",
+
+    // Street Light
+    lightFault: "Streetlight Completely Dark / Out",
+    lightsCount: "Entire Street Block / Dark Road",
+    securityRisk: "Dark Alley / High Crime Vulnerability",
+    poleTag: ""
   });
 
   const [location, setLocation] = useState(null);
@@ -80,8 +116,42 @@ export default function ComplaintForm() {
 
   const currentCategory = ISSUE_CATEGORIES.find((c) => c.id === form.category) || ISSUE_CATEGORIES[0];
 
+  // Keep form category synced if URL query parameter changes
+  useEffect(() => {
+    if (queryCat && ISSUE_CATEGORIES.some((c) => c.id === queryCat) && queryCat !== form.category) {
+      setForm((prev) => ({ ...prev, category: queryCat }));
+    }
+  }, [queryCat]);
+
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === "category") {
+      setSearchParams({ category: value }, { replace: true });
+    }
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDetailChange = (e) => {
+    const { name, value } = e.target;
+    setCategoryDetails((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Helper to format category-specific summary string for storage & display
+  const getCategorySpecificSummary = () => {
+    switch (form.category) {
+      case "flood":
+        return `Depth: ${categoryDetails.floodDepth} | Cause: ${categoryDetails.drainageStatus} | Zone: ${categoryDetails.affectedImpact} | Water in Houses: ${categoryDetails.waterEntering}`;
+      case "garbage":
+        return `Waste Type: ${categoryDetails.wasteType} | Condition: ${categoryDetails.dumpsterStatus} | Duration: ${categoryDetails.accumulationDuration} | Hazard: ${categoryDetails.healthHazard}`;
+      case "road_damage":
+        return `Damage Type: ${categoryDetails.damageType} | Size: ${categoryDetails.potholeSize} | Road: ${categoryDetails.roadClass} | Risk: ${categoryDetails.hazardLevel}`;
+      case "power_failure":
+        return `Scope: ${categoryDetails.outageScope} | Fault: ${categoryDetails.outageSymptom} | Hazard: ${categoryDetails.criticalDanger} | Duration: ${categoryDetails.outageDuration}`;
+      case "street_light":
+        return `Fault: ${categoryDetails.lightFault} | Extent: ${categoryDetails.lightsCount} | Risk: ${categoryDetails.securityRisk}${categoryDetails.poleTag ? ` | Tag: ${categoryDetails.poleTag}` : ""}`;
+      default:
+        return "";
+    }
   };
 
   // Auto-redirect timer to Home page after submission
@@ -127,7 +197,6 @@ export default function ComplaintForm() {
             const geoData = await geoRes.json();
             const address = geoData.address || {};
             
-            // Extract District dynamically
             const detectedDistrict =
               address.state_district ||
               address.county ||
@@ -135,7 +204,6 @@ export default function ComplaintForm() {
               address.state ||
               "";
 
-            // Extract Main City / Town dynamically
             const detectedCity =
               address.city ||
               address.town ||
@@ -143,7 +211,6 @@ export default function ComplaintForm() {
               address.city_district ||
               "";
 
-            // Extract Specific Area / Suburb / Neighbourhood dynamically
             const detectedArea =
               address.suburb ||
               address.neighbourhood ||
@@ -197,18 +264,18 @@ export default function ComplaintForm() {
     }
   };
 
-
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     const trackingId = "CP-" + Math.floor(100000 + Math.random() * 900000);
+    const specificSummary = getCategorySpecificSummary();
 
     const data = new FormData();
     Object.keys(form).forEach((key) => {
       data.append(key, form[key]);
     });
+    data.append("specific_details", specificSummary);
 
     if (location) {
       data.append("latitude", location.latitude);
@@ -230,6 +297,7 @@ export default function ComplaintForm() {
       district: form.district,
       city: form.city,
       area: form.area,
+      specific_details: specificSummary,
       description: form.description,
       severity: "PENDING",
       status: "Registered & Dispatched",
@@ -263,6 +331,7 @@ export default function ComplaintForm() {
         district: form.district,
         city: form.city,
         area: form.area,
+        specificSummary,
         date: new Date().toLocaleString()
       });
     }
@@ -302,7 +371,8 @@ export default function ComplaintForm() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 24
+              fontSize: 24,
+              transition: "all 0.3s ease"
             }}
           >
             {currentCategory.icon}
@@ -350,24 +420,32 @@ export default function ComplaintForm() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Issue Category Selection */}
+          {/* Static Complaint Category Display (Dropdown removed as requested) */}
           <div className="form-group">
             <label className="form-label">
-              <span>📌</span> Select Issue Category *
+              <span>📌</span> Category
             </label>
-            <select
-              name="category"
-              value={form.category}
-              onChange={handleChange}
-              className="form-select"
-              style={{ borderColor: currentCategory.border }}
+            <div
+              style={{
+                padding: "12px 16px",
+                backgroundColor: "var(--bg-input)",
+                border: `1px solid ${currentCategory.border}`,
+                borderRadius: "var(--radius-md)",
+                color: "var(--text-main)",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between"
+              }}
             >
-              {ISSUE_CATEGORIES.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.icon} {cat.label}
-                </option>
-              ))}
-            </select>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 20 }}>{currentCategory.icon}</span>
+                <span style={{ fontSize: "0.98rem" }}>{currentCategory.label}</span>
+              </div>
+              <span className={`category-badge ${currentCategory.badgeClass}`} style={{ fontSize: "0.75rem" }}>
+                Specific Complaint Type
+              </span>
+            </div>
           </div>
 
           {/* Citizen Details */}
@@ -451,10 +529,415 @@ export default function ComplaintForm() {
             </div>
           </div>
 
+          {/* DYNAMIC CATEGORY-SPECIFIC FORM FIELDS */}
+          <div
+            style={{
+              backgroundColor: currentCategory.bg,
+              border: `1px solid ${currentCategory.border}`,
+              borderRadius: 14,
+              padding: "20px 22px",
+              marginBottom: 24,
+              transition: "all 0.3s ease"
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 16,
+                borderBottom: `1px solid ${currentCategory.border}`,
+                paddingBottom: 10
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 20 }}>{currentCategory.icon}</span>
+                <h3 style={{ fontSize: "1.08rem", margin: 0, color: "var(--text-main)", fontWeight: 700 }}>
+                  {currentCategory.label} — Specific Incident Details
+                </h3>
+              </div>
+              <span
+                className={`category-badge ${currentCategory.badgeClass}`}
+                style={{ fontSize: "0.75rem", padding: "4px 10px" }}
+              >
+                Category Dynamic Form
+              </span>
+            </div>
+
+            {/* FLOOD SPECIFIC FIELDS */}
+            {form.category === "flood" && (
+              <div className="grid-2">
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>📏</span> Water Depth / Flood Level *
+                  </label>
+                  <select
+                    name="floodDepth"
+                    value={categoryDetails.floodDepth}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Ankle Deep (< 1 ft)">Ankle Deep (&lt; 1 ft) — Minor</option>
+                    <option value="Knee Deep (1 - 2 ft)">Knee Deep (1 - 2 ft) — Moderate</option>
+                    <option value="Waist Deep (2 - 4 ft)">Waist Deep (2 - 4 ft) — Severe</option>
+                    <option value="Critical Inundation / Submerged Houses (> 4 ft)">
+                      Critical Inundation / Submerged Houses (&gt; 4 ft)
+                    </option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🚰</span> Primary Drainage Condition *
+                  </label>
+                  <select
+                    name="drainageStatus"
+                    value={categoryDetails.drainageStatus}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Blocked Storm Drain / Drain Grate">Blocked Storm Drain / Drain Grate</option>
+                    <option value="Canal or River Overflow">Canal or River Overflow</option>
+                    <option value="Culvert Blocked by Debris / Trash">Culvert Blocked by Debris / Trash</option>
+                    <option value="Inadequate Main Drain Capacity">Inadequate Main Drain Capacity</option>
+                    <option value="Flash Flood Surface Runoff">Flash Flood Surface Runoff</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🏢</span> Primary Affected Zone *
+                  </label>
+                  <select
+                    name="affectedImpact"
+                    value={categoryDetails.affectedImpact}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Residential Houses & Yard Areas">Residential Houses &amp; Yard Areas</option>
+                    <option value="Main Highway / Vehicle Traffic Halted">Main Highway / Vehicle Traffic Halted</option>
+                    <option value="Commercial Market / Shops">Commercial Market / Shops</option>
+                    <option value="School or Medical Center Access">School or Medical Center Access</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🏠</span> Is Water Entering Buildings/Houses? *
+                  </label>
+                  <select
+                    name="waterEntering"
+                    value={categoryDetails.waterEntering}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Yes - Ground Floor Inundated">Yes - Ground Floor Inundated</option>
+                    <option value="No - Limited to Roads/Yards">No - Limited to Roads/Yards</option>
+                    <option value="Risk Impending (Rising Rapidly)">Risk Impending (Rising Rapidly)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* GARBAGE & WASTE SPECIFIC FIELDS */}
+            {form.category === "garbage" && (
+              <div className="grid-2">
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>♻️</span> Specific Type of Waste *
+                  </label>
+                  <select
+                    name="wasteType"
+                    value={categoryDetails.wasteType}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Household Organic & Food Waste">Household Organic &amp; Food Waste</option>
+                    <option value="Bulk Construction & Demolition Debris">Bulk Construction &amp; Demolition Debris</option>
+                    <option value="Commercial Plastics & Packaging Materials">Commercial Plastics &amp; Packaging</option>
+                    <option value="Hazardous, Medical or E-Waste">Hazardous, Medical or E-Waste</option>
+                    <option value="Dead Animal Carcass">Dead Animal Carcass</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🗑️</span> Waste Dump / Bin Condition *
+                  </label>
+                  <select
+                    name="dumpsterStatus"
+                    value={categoryDetails.dumpsterStatus}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Overflowing Municipal Trash Bin">Overflowing Municipal Trash Bin</option>
+                    <option value="Illegal Open Waste Dumping Site">Illegal Open Waste Dumping Site</option>
+                    <option value="Uncollected Scheduled Household Bags">Uncollected Scheduled Household Bags</option>
+                    <option value="Waste Accumulation in Storm Drain/Canal">Waste Accumulation in Storm Drain/Canal</option>
+                    <option value="Open Burning Waste Hazard">Open Burning Waste Hazard</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>⏱️</span> Uncollected Time Duration *
+                  </label>
+                  <select
+                    name="accumulationDuration"
+                    value={categoryDetails.accumulationDuration}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="1 - 2 Days">1 - 2 Days</option>
+                    <option value="3 - 5 Days">3 - 5 Days</option>
+                    <option value="Over 1 Week">Over 1 Week</option>
+                    <option value="Chronic Ongoing Dumping Site (> 1 Month)">Chronic Ongoing Dumping Site (&gt; 1 Month)</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>☣️</span> Primary Health & Environmental Hazard *
+                  </label>
+                  <select
+                    name="healthHazard"
+                    value={categoryDetails.healthHazard}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Severe Foul Odor & Pest Infestation (Flies/Rats)">Severe Foul Odor &amp; Pest Infestation (Flies/Rats)</option>
+                    <option value="Blocking Roadway / Sidewalk Access">Blocking Roadway / Sidewalk Access</option>
+                    <option value="Stagnant Leachate / Disease Risk">Stagnant Leachate / Disease Risk</option>
+                    <option value="Fire & Smoke Danger">Fire &amp; Smoke Danger</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* ROAD DAMAGE SPECIFIC FIELDS */}
+            {form.category === "road_damage" && (
+              <div className="grid-2">
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🛠️</span> Surface Damage Type *
+                  </label>
+                  <select
+                    name="damageType"
+                    value={categoryDetails.damageType}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Deep Pothole / Crater">Deep Pothole / Crater</option>
+                    <option value="Asphalt Subsidence / Caved-in Surface">Asphalt Subsidence / Caved-in Surface</option>
+                    <option value="Broken / Missing Manhole Cover">Broken / Missing Manhole Cover</option>
+                    <option value="Extensive Road Surface Cracking">Extensive Road Surface Cracking</option>
+                    <option value="Loose Gravel / Hazardous Debris">Loose Gravel / Hazardous Debris</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>📐</span> Estimated Pothole / Damage Size *
+                  </label>
+                  <select
+                    name="potholeSize"
+                    value={categoryDetails.potholeSize}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Small (< 1 foot wide)">Small (&lt; 1 foot wide)</option>
+                    <option value="Medium (1 - 3 feet wide)">Medium (1 - 3 feet wide)</option>
+                    <option value="Large (> 3 feet / Deep Crater)">Large (&gt; 3 feet / Deep Crater)</option>
+                    <option value="Multi-lane Hazardous Stretch">Multi-lane Hazardous Stretch</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🛣️</span> Road Type / Classification *
+                  </label>
+                  <select
+                    name="roadClass"
+                    value={categoryDetails.roadClass}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Main Arterial Road / Expressway">Main Arterial Road / Expressway</option>
+                    <option value="Residential Neighborhood Street">Residential Neighborhood Street</option>
+                    <option value="Commercial / Market Area Road">Commercial / Market Area Road</option>
+                    <option value="Bridge / Flyover Access Ramp">Bridge / Flyover Access Ramp</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>⚠️</span> Immediate Hazard / Risk Level *
+                  </label>
+                  <select
+                    name="hazardLevel"
+                    value={categoryDetails.hazardLevel}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Vehicle Axle / Tire Damage Reported">Vehicle Axle / Tire Damage Reported</option>
+                    <option value="Extreme Hazard for Motorcycles / Bicycles">Extreme Hazard for Motorcycles / Bicycles</option>
+                    <option value="Severe Traffic Bottleneck / Congestion">Severe Traffic Bottleneck / Congestion</option>
+                    <option value="Pedestrian Trip & Fall Risk">Pedestrian Trip &amp; Fall Risk</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* POWER FAILURE SPECIFIC FIELDS */}
+            {form.category === "power_failure" && (
+              <div className="grid-2">
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🌐</span> Extent / Scope of Outage *
+                  </label>
+                  <select
+                    name="outageScope"
+                    value={categoryDetails.outageScope}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Single Residential House / Compound">Single Residential House / Compound</option>
+                    <option value="Entire Street / Neighborhood Block">Entire Street / Neighborhood Block</option>
+                    <option value="Commercial Zone / Industrial Area">Commercial Zone / Industrial Area</option>
+                    <option value="Substation Feeder Level Blackout">Substation Feeder Level Blackout</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>⚡</span> Observed Electrical Fault *
+                  </label>
+                  <select
+                    name="outageSymptom"
+                    value={categoryDetails.outageSymptom}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Total Power Blackout (No Supply)">Total Power Blackout (No Supply)</option>
+                    <option value="Single Phase Loss / Voltage Drop">Single Phase Loss / Voltage Drop</option>
+                    <option value="Transformer Sparking / Explosion Noise">Transformer Sparking / Explosion Noise</option>
+                    <option value="Downed Power Line / Broken Pole">Downed Power Line / Broken Pole</option>
+                    <option value="Frequent Intermittent Tripping">Frequent Intermittent Tripping</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🔥</span> Critical Safety Hazard *
+                  </label>
+                  <select
+                    name="criticalDanger"
+                    value={categoryDetails.criticalDanger}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Fallen Live Wire on Ground / Tree">Fallen Live Wire on Ground / Tree (High Risk!)</option>
+                    <option value="Transformer Fire or Thick Smoke">Transformer Fire or Thick Smoke</option>
+                    <option value="Sparking Junction Box on Pole">Sparking Junction Box on Pole</option>
+                    <option value="No Immediate Wire Hazard">No Immediate Wire Hazard</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>⏳</span> Duration of Current Outage *
+                  </label>
+                  <select
+                    name="outageDuration"
+                    value={categoryDetails.outageDuration}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Under 1 Hour">Under 1 Hour</option>
+                    <option value="1 - 3 Hours">1 - 3 Hours</option>
+                    <option value="3 - 8 Hours">3 - 8 Hours</option>
+                    <option value="Over 12 Hours / Overnight">Over 12 Hours / Overnight</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* BROKEN STREET LIGHT SPECIFIC FIELDS */}
+            {form.category === "street_light" && (
+              <div className="grid-2">
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>💡</span> Lighting Fault Type *
+                  </label>
+                  <select
+                    name="lightFault"
+                    value={categoryDetails.lightFault}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Streetlight Completely Dark / Out">Streetlight Completely Dark / Out</option>
+                    <option value="Flickering / Intermittent Bulb">Flickering / Intermittent Bulb</option>
+                    <option value="Pole Leaning / Physical Damage">Pole Leaning / Physical Damage</option>
+                    <option value="Exposed Wiring / Open Base Box">Exposed Wiring / Open Base Box</option>
+                    <option value="Light ON continuously during day">Light ON continuously during day</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>📍</span> Fixtures Affected *
+                  </label>
+                  <select
+                    name="lightsCount"
+                    value={categoryDetails.lightsCount}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Single Pole">Single Pole</option>
+                    <option value="2 - 4 Poles in Sequence">2 - 4 Poles in Sequence</option>
+                    <option value="Entire Street Block / Dark Road">Entire Street Block / Dark Road</option>
+                    <option value="Public Park / Community Area">Public Park / Community Area</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🛡️</span> Dark Area Security Risk *
+                  </label>
+                  <select
+                    name="securityRisk"
+                    value={categoryDetails.securityRisk}
+                    onChange={handleDetailChange}
+                    className="form-select"
+                  >
+                    <option value="Dark Alley / High Crime Vulnerability">Dark Alley / High Crime Vulnerability</option>
+                    <option value="Busy Pedestrian Crossing / Intersection">Busy Pedestrian Crossing / Intersection</option>
+                    <option value="School Zone or Hospital Approach">School Zone or Hospital Approach</option>
+                    <option value="Standard Residential Street">Standard Residential Street</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">
+                    <span>🏷️</span> Pole ID Tag / Reference (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    name="poleTag"
+                    placeholder="e.g. SL-104 (printed on pole base)"
+                    value={categoryDetails.poleTag}
+                    onChange={handleDetailChange}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Complaint Description */}
           <div className="form-group">
             <label className="form-label">
-              <span>📝</span> Complaint Description & Details *
+              <span>📝</span> Complaint Description &amp; Details *
             </label>
             <textarea
               name="description"
@@ -556,7 +1039,7 @@ export default function ComplaintForm() {
           <div
             className="glass-card"
             style={{
-              maxWidth: 520,
+              maxWidth: 540,
               width: "100%",
               padding: 36,
               textAlign: "center",
@@ -629,6 +1112,12 @@ export default function ComplaintForm() {
                 <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>LOCATION</span>
                 <span style={{ color: "#f8fafc", fontSize: "0.88rem" }}>
                   {[submissionSuccess.area, submissionSuccess.city, submissionSuccess.district].filter(Boolean).join(", ")}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, gap: 12 }}>
+                <span style={{ fontSize: "0.8rem", color: "#94a3b8", flexShrink: 0 }}>SPECIFIC DETAILS</span>
+                <span style={{ color: "#cbd5e1", fontSize: "0.82rem", textAlign: "right" }}>
+                  {submissionSuccess.specificSummary}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
