@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import api from "../services/api";
+import { submitComplaint } from "../services/api";
 
 const ISSUE_CATEGORIES = [
   {
@@ -60,7 +60,7 @@ export default function ComplaintForm() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const queryCat = searchParams.get("category");
-  const initialCategory = ISSUE_CATEGORIES.some((c) => c.id === queryCat) ? queryCat : "flood";
+  const initialCategory = ISSUE_CATEGORIES.some((c) => c.id === queryCat) ? queryCat : "";
 
   const [form, setForm] = useState({
     category: initialCategory,
@@ -114,7 +114,7 @@ export default function ComplaintForm() {
   const [submissionSuccess, setSubmissionSuccess] = useState(null);
   const [countdown, setCountdown] = useState(5);
 
-  const currentCategory = ISSUE_CATEGORIES.find((c) => c.id === form.category) || ISSUE_CATEGORIES[0];
+  const currentCategory = ISSUE_CATEGORIES.find((c) => c.id === form.category);
 
   // Keep form category synced if URL query parameter changes
   useEffect(() => {
@@ -304,6 +304,7 @@ export default function ComplaintForm() {
       submitted_at: "Just now"
     };
 
+    // Persist to localStorage for instant optimistic update on Dashboard
     try {
       const storedStr = localStorage.getItem("civic_pulse_user_complaints");
       const storedList = storedStr ? JSON.parse(storedStr) : [];
@@ -316,14 +317,53 @@ export default function ComplaintForm() {
     }
 
     try {
-      await api.post("/predict", data);
+      // POST to real backend — get AI triage result
+      const response = await submitComplaint(data);
+      const serverData = response.data;
+
+      // Update localStorage record with server-assigned values
+      try {
+        const storedStr = localStorage.getItem("civic_pulse_user_complaints");
+        const storedList = storedStr ? JSON.parse(storedStr) : [];
+        const updated = storedList.map((c) =>
+          c.id === trackingId
+            ? {
+                ...c,
+                id: serverData.tracking_id || trackingId,
+                severity: serverData.severity || "PENDING",
+                status: serverData.status || "Registered",
+              }
+            : c
+        );
+        localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
+      } catch (_) {}
+
+      setLoading(false);
+      setCountdown(5);
+      setSubmissionSuccess({
+        trackingId: serverData.tracking_id || trackingId,
+        severity: serverData.severity || "PENDING",
+        priorityScore: serverData.priority_score,
+        predictedEscalation: serverData.predicted_escalation,
+        status: serverData.status || "Registered",
+        categoryLabel: currentCategory.label,
+        categoryIcon: currentCategory.icon,
+        name: form.name,
+        phone: form.phone,
+        district: form.district,
+        city: form.city,
+        area: form.area,
+        specificSummary,
+        date: new Date().toLocaleString()
+      });
     } catch (err) {
-      console.log("Proceeding with successful client submission confirmation", err);
-    } finally {
+      console.warn("Backend unavailable, using client-side tracking:", err);
       setLoading(false);
       setCountdown(5);
       setSubmissionSuccess({
         trackingId,
+        severity: "PENDING",
+        status: "Registered",
         categoryLabel: currentCategory.label,
         categoryIcon: currentCategory.icon,
         name: form.name,
@@ -343,17 +383,53 @@ export default function ComplaintForm() {
 
   return (
     <div style={{ maxWidth: 840, margin: "0 auto" }}>
-      <div
-        className="glass-card"
-        style={{
-          borderTop: `4px solid ${currentCategory.color}`,
-          transition: "border-color 0.3s ease",
-          position: "relative",
-          overflow: "hidden"
-        }}
-      >
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+      {!currentCategory && !submissionSuccess ? (
+        <div style={{ textAlign: "left" }}>
+          <h2 style={{ fontSize: "1.75rem", marginBottom: 8, color: "#f8fafc" }}>Select Complaint Category</h2>
+          <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>Please select the type of issue you want to report.</p>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16 }}>
+            {ISSUE_CATEGORIES.map((cat) => (
+              <div
+                key={cat.id}
+                onClick={() => {
+                  setSearchParams({ category: cat.id }, { replace: true });
+                  setForm(prev => ({ ...prev, category: cat.id }));
+                }}
+                className="glass-card"
+                style={{
+                  textAlign: "left", padding: 24, cursor: "pointer",
+                  display: "flex", flexDirection: "column", justifyContent: "space-between",
+                  border: `1px solid ${cat.border}`,
+                  transition: "all 0.2s ease",
+                  backgroundColor: "rgba(17, 28, 50, 0.75)"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = cat.bg}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(17, 28, 50, 0.75)"}
+              >
+                <div>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>{cat.icon}</div>
+                  <h3 style={{ fontSize: "1.05rem", marginBottom: 8, color: "var(--text-main)" }}>{cat.label}</h3>
+                  <p style={{ fontSize: "0.83rem", color: "var(--text-muted)", lineHeight: 1.55 }}>
+                    {cat.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : currentCategory ? (
+        <div
+          className="glass-card"
+          style={{
+            borderTop: `4px solid ${currentCategory.color}`,
+            transition: "border-color 0.3s ease",
+            position: "relative",
+            overflow: "hidden"
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
           <div>
             <div className={`category-badge ${currentCategory.badgeClass}`} style={{ marginBottom: 12 }}>
               <span>{currentCategory.icon}</span> {currentCategory.label}
@@ -1015,7 +1091,8 @@ export default function ComplaintForm() {
             {loading ? "Submitting..." : `Submit ${currentCategory.label} Report`}
           </button>
         </form>
-      </div>
+        </div>
+      ) : null}
 
       {/* Success Modal Pop-up with Auto-Redirect */}
       {submissionSuccess && (
@@ -1120,10 +1197,38 @@ export default function ComplaintForm() {
                   {submissionSuccess.specificSummary}
                 </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                 <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>SUBMITTED AT</span>
                 <span style={{ color: "#64748b", fontSize: "0.8rem" }}>{submissionSuccess.date}</span>
               </div>
+              {/* AI Triage Results */}
+              {submissionSuccess.severity && submissionSuccess.severity !== "PENDING" && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #1e3058" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                    🤖 AI Triage Result
+                  </div>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{
+                      padding: "4px 12px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 700,
+                      background: submissionSuccess.severity === "CRITICAL" ? "rgba(239,68,68,0.18)" : submissionSuccess.severity === "HIGH" ? "rgba(249,115,22,0.18)" : submissionSuccess.severity === "MEDIUM" ? "rgba(234,179,8,0.18)" : "rgba(34,197,94,0.18)",
+                      color: submissionSuccess.severity === "CRITICAL" ? "#ef4444" : submissionSuccess.severity === "HIGH" ? "#f97316" : submissionSuccess.severity === "MEDIUM" ? "#eab308" : "#22c55e",
+                      border: `1px solid ${submissionSuccess.severity === "CRITICAL" ? "rgba(239,68,68,0.4)" : submissionSuccess.severity === "HIGH" ? "rgba(249,115,22,0.4)" : submissionSuccess.severity === "MEDIUM" ? "rgba(234,179,8,0.4)" : "rgba(34,197,94,0.4)"}`
+                    }}>
+                      {submissionSuccess.severity} SEVERITY
+                    </span>
+                    {submissionSuccess.predictedEscalation && (
+                      <span style={{ padding: "4px 12px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 600, background: "rgba(100,116,139,0.18)", color: "#94a3b8", border: "1px solid rgba(100,116,139,0.3)" }}>
+                        {submissionSuccess.predictedEscalation === "Likely to Escalate" ? "⚠️" : submissionSuccess.predictedEscalation === "Monitor Closely" ? "👁️" : "✓"} {submissionSuccess.predictedEscalation}
+                      </span>
+                    )}
+                    {submissionSuccess.status && (
+                      <span style={{ padding: "4px 12px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 600, background: "rgba(52,211,153,0.15)", color: "#34d399", border: "1px solid rgba(52,211,153,0.3)" }}>
+                        {submissionSuccess.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
