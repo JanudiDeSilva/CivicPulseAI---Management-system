@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useLang } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
 import logoSvg from "../assets/logo.svg?raw";
 
 function LogoIcon({ className }) {
-  // Inline SVG so currentColor inherits the CSS variable
   return (
     <div
       className={className}
@@ -18,13 +18,13 @@ export default function Navbar() {
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
   const { lang, switchLang, t } = useLang();
+  const { session, logout } = useAuth();
 
   const isActive = (path) => location.pathname === path;
 
   return (
     <header className="navbar-root">
       <div className="navbar-inner">
-        {/* Brand / Logo */}
         <Link to="/" className="navbar-brand">
           <LogoIcon className="navbar-logo" />
           <div>
@@ -35,7 +35,6 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Navigation Links */}
         <nav className="navbar-nav">
           <Link to="/" className={`navbar-link${isActive("/") ? " active" : ""}`}>
             {t("nav_home")}
@@ -43,14 +42,19 @@ export default function Navbar() {
           <Link to="/complaint" className={`navbar-link${isActive("/complaint") ? " active" : ""}`}>
             {t("nav_complaint")}
           </Link>
-          <Link to="/dashboard" className={`navbar-link${isActive("/dashboard") ? " active" : ""}`}>
-            {t("nav_dashboard")}
-          </Link>
+          {session?.role === "admin" && (
+            <Link to="/dashboard" className={`navbar-link${isActive("/dashboard") ? " active" : ""}`}>
+              {t("nav_dashboard")}
+            </Link>
+          )}
+          {session?.role === "user" && (
+            <Link to="/my-portal" className={`navbar-link${isActive("/my-portal") ? " active" : ""}`}>
+              My Portal
+            </Link>
+          )}
         </nav>
 
-        {/* Controls: Language + Theme */}
         <div className="navbar-controls">
-          {/* Language Switcher */}
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
             <button
               id="lang-en-btn"
@@ -70,10 +74,8 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* Divider */}
           <div style={{ width: 1, height: 22, background: "var(--border-color)", margin: "0 2px" }} />
 
-          {/* Theme Toggle */}
           <button
             id="theme-toggle-btn"
             onClick={toggleTheme}
@@ -83,6 +85,19 @@ export default function Navbar() {
           >
             {isDark ? "☀️" : "🌙"}
           </button>
+
+          {session ? (
+            <>
+              <span className="auth-status-chip">{session.role === "admin" ? "Admin" : "User"}</span>
+              <button className="btn btn-secondary" type="button" onClick={logout} style={{ padding: "8px 12px" }}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <Link to="/login" className="btn btn-primary" style={{ padding: "8px 14px" }}>
+              Sign In
+            </Link>
+          )}
         </div>
       </div>
     </header>

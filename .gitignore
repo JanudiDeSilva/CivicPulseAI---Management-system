@@ -12,7 +12,12 @@ backend/__pycache__/
 # React / Node.js
 # =========================
 frontend/node_modules/
+backend-express/node_modules/
 frontend/dist/
+
+# Ignore all node_modules anywhere (recommended)
+node_modules/
+
 
 # =========================
 # VS Code

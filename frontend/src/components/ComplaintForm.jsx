@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { submitComplaint } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 const ISSUE_CATEGORIES = [
   {
@@ -57,6 +58,7 @@ const ISSUE_CATEGORIES = [
 
 export default function ComplaintForm() {
   const navigate = useNavigate();
+  const { session } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const queryCat = searchParams.get("category");
@@ -291,6 +293,9 @@ export default function ComplaintForm() {
       id: trackingId,
       name: form.name,
       phone: form.phone,
+      email: session?.email || "guest@civicpulse.local",
+      created_by_email: session?.email || "guest@civicpulse.local",
+      nic: session?.nic || "",
       category: form.category,
       category_label: currentCategory.label,
       icon: currentCategory.icon,
@@ -300,7 +305,7 @@ export default function ComplaintForm() {
       specific_details: specificSummary,
       description: form.description,
       severity: "PENDING",
-      status: "Registered & Dispatched",
+      status: "Registered",
       submitted_at: "Just now"
     };
 

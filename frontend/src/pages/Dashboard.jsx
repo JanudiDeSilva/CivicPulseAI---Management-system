@@ -129,11 +129,21 @@ export default function Dashboard() {
       setComplaints((prev) =>
         prev.map((c) => (c.id === reportId ? { ...c, status: newStatus } : c))
       );
+      const stored = JSON.parse(localStorage.getItem("civic_pulse_user_complaints") || "[]");
+      const updated = stored.map((c) => (c.id === reportId ? { ...c, status: newStatus } : c));
+      localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
     } catch (err) {
       console.error("Status update failed:", err);
     } finally {
       setStatusUpdating(null);
     }
+  };
+
+  const handleReplySave = (reportId, replyText) => {
+    const stored = JSON.parse(localStorage.getItem("civic_pulse_user_complaints") || "[]");
+    const updated = stored.map((c) => (c.id === reportId ? { ...c, reply: replyText } : c));
+    localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
+    setComplaints(updated);
   };
 
   return (
@@ -300,6 +310,7 @@ export default function Dashboard() {
                   <th style={{ padding: "10px 14px" }}>Location</th>
                   <th style={{ padding: "10px 14px" }}>AI Severity</th>
                   <th style={{ padding: "10px 14px" }}>Status</th>
+                  <th style={{ padding: "10px 14px" }}>Reply</th>
                   <th style={{ padding: "10px 14px" }}>Submitted</th>
                 </tr>
               </thead>
@@ -318,6 +329,7 @@ export default function Dashboard() {
                       </td>
                       <td style={{ padding: "14px" }}>
                         <div style={{ fontWeight: 600, color: "#f8fafc", fontSize: "0.88rem" }}>{item.name || "—"}</div>
+                        <div style={{ fontSize: "0.75rem", color: "#64748b" }}>NIC: {item.nic || "—"}</div>
                         <div style={{ fontSize: "0.75rem", color: "#64748b" }}>{item.phone || ""}</div>
                       </td>
                       <td style={{ padding: "14px" }}>
@@ -357,6 +369,24 @@ export default function Dashboard() {
                           <option value="Resolved">Resolved</option>
                           <option value="Closed">Closed</option>
                         </select>
+                      </td>
+                      <td style={{ padding: "14px" }}>
+                        <textarea
+                          rows={2}
+                          defaultValue={item.reply || ""}
+                          onBlur={(e) => handleReplySave(item.id, e.target.value)}
+                          style={{
+                            width: "100%",
+                            minWidth: 180,
+                            background: "rgba(15,23,42,0.7)",
+                            color: "#e2e8f0",
+                            border: "1px solid #334155",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            fontSize: "0.78rem",
+                            resize: "vertical"
+                          }}
+                        />
                       </td>
                       <td style={{ padding: "14px", fontSize: "0.78rem", color: "#94a3b8", whiteSpace: "nowrap" }}>
                         {item.submitted_at || "—"}
