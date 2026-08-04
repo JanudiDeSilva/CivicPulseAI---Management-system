@@ -36,21 +36,24 @@ export default function Navbar() {
         </Link>
 
         <nav className="navbar-nav">
-          <Link to="/" className={`navbar-link${isActive("/") ? " active" : ""}`}>
-            {t("nav_home")}
-          </Link>
-          <Link to="/complaint" className={`navbar-link${isActive("/complaint") ? " active" : ""}`}>
-            {t("nav_complaint")}
-          </Link>
-          {session?.role === "admin" && (
+          {session?.role === "admin" ? (
             <Link to="/dashboard" className={`navbar-link${isActive("/dashboard") ? " active" : ""}`}>
               {t("nav_dashboard")}
             </Link>
-          )}
-          {session?.role === "user" && (
-            <Link to="/my-portal" className={`navbar-link${isActive("/my-portal") ? " active" : ""}`}>
-              My Portal
-            </Link>
+          ) : (
+            <>
+              <Link to="/" className={`navbar-link${isActive("/") ? " active" : ""}`}>
+                {t("nav_home")}
+              </Link>
+              <Link to="/complaint" className={`navbar-link${isActive("/complaint") ? " active" : ""}`}>
+                {t("nav_complaint")}
+              </Link>
+              {session?.role === "user" && (
+                <Link to="/my-portal" className={`navbar-link${isActive("/my-portal") ? " active" : ""}`}>
+                  My Portal
+                </Link>
+              )}
+            </>
           )}
         </nav>
 

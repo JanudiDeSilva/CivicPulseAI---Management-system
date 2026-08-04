@@ -14,6 +14,7 @@ const initialSignup = {
 
 const initialLogin = {
   email: "",
+  nic: "",
   password: "",
   role: "user",
 };
@@ -65,8 +66,15 @@ export default function AuthPage() {
     try {
       setLoading(true);
       setError("");
-      if (!loginForm.email || !loginForm.password) {
-        throw new Error("Email and password are required.");
+
+      if (loginForm.role === "admin") {
+        if (!loginForm.email || !loginForm.password) {
+          throw new Error("Admin email and password are required.");
+        }
+      } else {
+        if (!loginForm.nic || !loginForm.password) {
+          throw new Error("NIC number and password are required for the user portal.");
+        }
       }
 
       loginWithPassword(loginForm);
@@ -120,16 +128,29 @@ export default function AuthPage() {
               </select>
             </label>
 
-            <label className="form-group">
-              <span className="form-label">Email Address</span>
-              <input
-                className="form-input"
-                type="email"
-                placeholder="name@example.com"
-                value={loginForm.email}
-                onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))}
-              />
-            </label>
+            {loginForm.role === "admin" ? (
+              <label className="form-group">
+                <span className="form-label">Admin Email Address</span>
+                <input
+                  className="form-input"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={loginForm.email}
+                  onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))}
+                />
+              </label>
+            ) : (
+              <label className="form-group">
+                <span className="form-label">NIC Number</span>
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="Enter your NIC"
+                  value={loginForm.nic}
+                  onChange={(e) => setLoginForm((prev) => ({ ...prev, nic: e.target.value }))}
+                />
+              </label>
+            )}
 
             <label className="form-group">
               <span className="form-label">Password</span>
@@ -145,7 +166,7 @@ export default function AuthPage() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => handleSendOtp(loginForm.email || "admin@civicpulse.local")}
+              onClick={() => handleSendOtp(loginForm.email || "onethrajanu2003@gmail.com")}
             >
               Send OTP Demo
             </button>
@@ -155,7 +176,7 @@ export default function AuthPage() {
             </button>
 
             <div className="hint-box">
-              <strong>Temporary Admin Access:</strong> admin@civicpulse.local / Admin@123
+              <strong>Temporary Admin Access:</strong> onethrajanu2003@gmail.com / janudi
             </div>
           </form>
         ) : (

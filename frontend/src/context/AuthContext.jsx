@@ -11,17 +11,14 @@ const ADMIN_ACCOUNT = {
   firstName: "Municipal",
   lastName: "Admin",
   name: "Municipal Admin",
-  email: "admin@civicpulse.local",
+  email: "onethrajanu2003@gmail.com",
   nic: "000000000V",
   phone: "+94 11 222 3333",
-  password: "Admin@123",
+  password: "janudi",
   role: "admin",
 };
 
 const seedAccounts = () => {
-  const existing = localStorage.getItem(ACCOUNTS_KEY);
-  if (existing) return JSON.parse(existing);
-
   const seeded = [ADMIN_ACCOUNT];
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(seeded));
   return seeded;
@@ -31,8 +28,15 @@ const getAccounts = () => {
   try {
     const raw = localStorage.getItem(ACCOUNTS_KEY);
     if (!raw) return seedAccounts();
+
     const parsed = JSON.parse(raw);
-    return parsed.length ? parsed : seedAccounts();
+    const existingUsers = Array.isArray(parsed)
+      ? parsed.filter((account) => account.role !== "admin")
+      : [];
+
+    const authoritative = [ADMIN_ACCOUNT, ...existingUsers];
+    persistAccounts(authoritative);
+    return authoritative;
   } catch {
     return [ADMIN_ACCOUNT];
   }
@@ -70,7 +74,7 @@ export function AuthProvider({ children }) {
   const signupUser = ({ firstName, lastName, email, nic, phone, password, confirmPassword }) => {
     const accounts = getAccounts();
     const normalizedEmail = email.toLowerCase();
-    const exists = accounts.some((user) => user.email.toLowerCase() === normalizedEmail);
+    const exists = accounts.some((user) => user.email && user.email.toLowerCase() === normalizedEmail);
 
     if (!firstName || !lastName || !email || !nic || !phone || !password || !confirmPassword) {
       throw new Error("Please complete all registration fields.");
@@ -97,7 +101,8 @@ export function AuthProvider({ children }) {
     };
 
     const nextAccounts = [...accounts, user];
-    persistAccounts(nextAccounts);
+    const sanitizedAccounts = [ADMIN_ACCOUNT, ...nextAccounts.filter((account) => account.role !== "admin")];
+    persistAccounts(sanitizedAccounts);
     setSession(user);
     return user;
   };
@@ -105,7 +110,7 @@ export function AuthProvider({ children }) {
   const requestOtp = (email) => {
     const normalizedEmail = email.toLowerCase();
     const accounts = getAccounts();
-    const roleMatches = accounts.some((account) => account.email.toLowerCase() === normalizedEmail);
+    const roleMatches = accounts.some((account) => account.email && account.email.toLowerCase() === normalizedEmail);
 
     if (!roleMatches && normalizedEmail !== ADMIN_ACCOUNT.email) {
       throw new Error("This email is not registered. Please sign up first.");
@@ -114,13 +119,29 @@ export function AuthProvider({ children }) {
     return buildOtpPayload(normalizedEmail);
   };
 
-  const loginWithPassword = ({ email, password, role }) => {
-    const normalizedEmail = email.toLowerCase();
+  const loginWithPassword = ({ email, nic, password, role }) => {
     const accounts = getAccounts();
-    const foundUser = accounts.find((account) => account.email.toLowerCase() === normalizedEmail);
+    let foundUser = null;
+
+    if (role === "admin") {
+      foundUser = accounts.find((account) => account.role === "admin");
+      if (!foundUser) {
+        throw new Error("Admin account is not available.");
+      }
+
+      if (foundUser.email.toLowerCase() !== (email || "").toLowerCase()) {
+        throw new Error("Admin email is incorrect.");
+      }
+    } else {
+      foundUser = accounts.find((account) => {
+        const matchesNic = account.nic && account.nic.toLowerCase() === (nic || "").toLowerCase();
+        const matchesEmail = account.email && account.email.toLowerCase() === (email || "").toLowerCase();
+        return matchesNic || matchesEmail;
+      });
+    }
 
     if (!foundUser) {
-      throw new Error("This email is not registered. Please create an account first.");
+      throw new Error("This account is not registered. Please create an account first.");
     }
 
     if (foundUser.password !== password) {
@@ -128,7 +149,7 @@ export function AuthProvider({ children }) {
     }
 
     if (foundUser.role !== role) {
-      throw new Error("This email does not match the selected portal role.");
+      throw new Error("This account does not match the selected portal role.");
     }
 
     setSession(foundUser);
