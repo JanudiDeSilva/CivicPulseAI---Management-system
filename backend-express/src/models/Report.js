@@ -31,6 +31,7 @@ const Report = sequelize.define("Report", {
     escalation_confidence: DataTypes.FLOAT,
 
     status: { type: DataTypes.STRING, defaultValue: "Registered" },
+    admin_reply: { type: DataTypes.TEXT, allowNull: true },
 
     incident_id: { type: DataTypes.UUID, allowNull: true },
 }, {

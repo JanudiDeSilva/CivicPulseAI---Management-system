@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
 
 const CATEGORY_META = {
   flood:         { title: "Flood & Drainage",  icon: "🌊" },
@@ -28,6 +29,23 @@ export default function UserPortal() {
     description: "",
     phone: "",
   });
+
+  // Pull fresh data from backend to get admin_reply from DB
+  useEffect(() => {
+    const stored = loadComplaints();
+    if (stored.length === 0) return;
+    const ids = stored.map((c) => c.id).filter(Boolean);
+    Promise.allSettled(ids.map((id) => api.get(`/reports/${id}`)))
+      .then((results) => {
+        const updated = stored.map((c) => {
+          const match = results.find((r) => r.status === "fulfilled" && r.value.data.id === c.id);
+          if (match) return { ...c, admin_reply: match.value.data.admin_reply || null, status: match.value.data.status || c.status };
+          return c;
+        });
+        setComplaints(updated);
+        localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
+      });
+  }, []);
 
   const mine = useMemo(
     () => complaints.filter((item) => item.email === session?.email || item.created_by_email === session?.email),
@@ -97,9 +115,10 @@ export default function UserPortal() {
 
                 <div className="ticket-desc">{item.description || "No complaint details saved."}</div>
 
-                {item.reply && (
-                  <div className="reply-box">
-                    <strong>Admin Reply:</strong> {item.reply}
+                {item.admin_reply && (
+                  <div className="reply-box" style={{ marginTop: 10, padding: "10px 14px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 8 }}>
+                    <div style={{ fontSize: "0.75rem", color: "#93c5fd", fontWeight: 700, marginBottom: 4 }}>📨 Official Admin Reply:</div>
+                    <div style={{ fontSize: "0.88rem", color: "#e2e8f0" }}>{item.admin_reply}</div>
                   </div>
                 )}
 

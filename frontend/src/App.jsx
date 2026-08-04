@@ -25,7 +25,14 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<AuthPage />} />
-                <Route path="/complaint" element={<Complaint />} />
+                <Route
+                  path="/complaint"
+                  element={
+                    <ProtectedRoute role="user">
+                      <Complaint />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/success" element={<Success />} />
                 <Route
                   path="/dashboard"

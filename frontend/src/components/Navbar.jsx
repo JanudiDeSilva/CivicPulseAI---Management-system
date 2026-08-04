@@ -45,7 +45,7 @@ export default function Navbar() {
               <Link to="/" className={`navbar-link${isActive("/") ? " active" : ""}`}>
                 {t("nav_home")}
               </Link>
-              <Link to="/complaint" className={`navbar-link${isActive("/complaint") ? " active" : ""}`}>
+              <Link to={session ? "/complaint" : "/login"} className={`navbar-link${isActive("/complaint") ? " active" : ""}`}>
                 {t("nav_complaint")}
               </Link>
               {session?.role === "user" && (

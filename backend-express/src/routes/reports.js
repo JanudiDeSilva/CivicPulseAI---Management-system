@@ -2,6 +2,7 @@ import express from "express";
 import { v4 as uuidv4 } from "uuid";
 import { Report } from "../models/index.js";
 import { triage } from "../services/triage.js";
+import { getFloodRiskFromComplaint } from "../services/floodRiskClient.js";
 import { upload } from "../middleware/upload.js";
 import { categoryLabel, categoryIcon, humanizeTime } from "../utils/helpers.js";
 
@@ -18,9 +19,31 @@ router.post("/predict", upload.single("photo"), async (req, res) => {
         const shortId = uuidv4().replace(/-/g, "").slice(0, 6);
         const trackingId = `CP-${shortId}`;
 
-        const { severity, priorityScore, predictedEscalation, escalationConfidence } = triage({
-            category, rawText: description, specificDetails: specific_details,
-        });
+        let severity, priorityScore, predictedEscalation, escalationConfidence;
+
+        if (category === "flood") {
+            const floodRisk = await getFloodRiskFromComplaint({
+                district, place_name: area || city, latitude, longitude
+            });
+            if (floodRisk) {
+                severity = floodRisk.risk_level === "HIGH" ? "CRITICAL" : floodRisk.risk_level === "MODERATE" ? "HIGH" : "MEDIUM";
+                priorityScore = floodRisk.flood_probability;
+                predictedEscalation = floodRisk.flood_occurrence === "yes" ? "YES" : "NO";
+                escalationConfidence = floodRisk.confidence;
+            } else {
+                const triageResult = triage({ category, rawText: description, specificDetails: specific_details });
+                severity = triageResult.severity;
+                priorityScore = triageResult.priorityScore;
+                predictedEscalation = triageResult.predictedEscalation;
+                escalationConfidence = triageResult.escalationConfidence;
+            }
+        } else {
+            const triageResult = triage({ category, rawText: description, specificDetails: specific_details });
+            severity = triageResult.severity;
+            priorityScore = triageResult.priorityScore;
+            predictedEscalation = triageResult.predictedEscalation;
+            escalationConfidence = triageResult.escalationConfidence;
+        }
 
         let status;
         if (severity === "CRITICAL") status = "Dispatched";
@@ -92,6 +115,7 @@ router.get("/reports", async (req, res) => {
         severity: r.severity,
         priority_score: r.priority_score,
         status: r.status,
+        admin_reply: r.admin_reply || null,
         predicted_escalation: r.predicted_escalation,
         escalation_confidence: r.escalation_confidence,
         source: r.source,
@@ -143,6 +167,21 @@ router.patch("/reports/:id/status", async (req, res) => {
     report.status = status;
     await report.save();
     res.json({ id: report.id, status: report.status, message: "Status updated" });
+});
+
+// ─── PATCH /reports/:id/reply ───────────────────────────────────────────────
+router.patch("/reports/:id/reply", async (req, res) => {
+    const { reply } = req.body;
+    if (reply === undefined) {
+        return res.status(400).json({ detail: "reply field is required" });
+    }
+
+    const report = await Report.findByPk(req.params.id);
+    if (!report) return res.status(404).json({ detail: "Report not found" });
+
+    report.admin_reply = reply;
+    await report.save();
+    res.json({ id: report.id, admin_reply: report.admin_reply, message: "Reply saved" });
 });
 
 export default router;

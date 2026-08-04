@@ -22,10 +22,15 @@ export const submitComplaint = (formData) =>
   api.post("/predict", formData);
 
 // Update a report's status
-export const updateReportStatus = (reportId, status) => {
-  const fd = new FormData();
-  fd.append("status", status);
-  return api.patch(`/reports/${reportId}/status`, fd);
-};
+export const updateReportStatus = (reportId, status) =>
+  api.patch(`/reports/${reportId}/status`, { status });
+
+// Send admin reply to a report
+export const updateReportReply = (reportId, reply) =>
+  api.patch(`/reports/${reportId}/reply`, { reply });
+
+// Fetch a single report by id
+export const fetchReport = (reportId) =>
+  api.get(`/reports/${reportId}`);
 
 export default api;

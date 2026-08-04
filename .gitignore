@@ -4,6 +4,8 @@
 backend/venv/
 backend/.env
 backend/__pycache__/
+backend-express/ml_service/venv/
+backend-express/ml_service/.env
 **/__pycache__/
 *.py[cod]
 *.pyo

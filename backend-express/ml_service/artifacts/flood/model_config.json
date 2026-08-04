@@ -1,0 +1,35 @@
+{
+  "model_name": "XGBoost",
+  "accuracy": 0.9196,
+  "target_classes": [
+    "no",
+    "yes"
+  ],
+  "features_used": [
+    "district",
+    "place_name",
+    "latitude",
+    "longitude",
+    "elevation_m",
+    "distance_to_river_m",
+    "landcover",
+    "soil_type",
+    "water_supply",
+    "electricity",
+    "road_quality",
+    "population_density_per_km2",
+    "built_up_percent",
+    "urban_rural",
+    "rainfall_7d_mm",
+    "monthly_rainfall_mm",
+    "drainage_index",
+    "ndvi",
+    "ndwi",
+    "water_presence_flag",
+    "historical_flood_count",
+    "infrastructure_score",
+    "nearest_hospital_km",
+    "nearest_evac_km"
+  ],
+  "model_columns_count": 851
+}

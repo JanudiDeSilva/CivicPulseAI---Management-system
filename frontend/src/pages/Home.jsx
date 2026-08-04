@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useLang } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
 
 const CATEGORIES = [
   {
@@ -53,6 +54,7 @@ const STATS = [
 
 export default function Home() {
   const { t, lang } = useLang();
+  const { session } = useAuth();
 
   return (
     <div style={{ textAlign: "center", maxWidth: 1100, margin: "0 auto" }}>
@@ -85,7 +87,7 @@ export default function Home() {
         </p>
 
         <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-          <Link to="/complaint?category=flood" className="btn btn-primary" style={{ padding: "14px 32px", fontSize: "1.05rem" }}>
+          <Link to={session ? "/complaint?category=flood" : "/login"} className="btn btn-primary" style={{ padding: "14px 32px", fontSize: "1.05rem" }}>
             📢 {t("home_report_btn")}
           </Link>
           <Link to="/dashboard" className="btn btn-secondary" style={{ padding: "14px 28px", fontSize: "1.05rem" }}>
@@ -150,7 +152,7 @@ export default function Home() {
                 </p>
               </div>
               <Link
-                to={`/complaint?category=${cat.id}`}
+                to={session ? `/complaint?category=${cat.id}` : "/login"}
                 className="btn btn-secondary"
                 style={{ fontSize: "0.83rem", padding: "8px 12px", width: "100%", justifyContent: "space-between" }}
               >

@@ -118,6 +118,12 @@ export default function ComplaintForm() {
 
   const currentCategory = ISSUE_CATEGORIES.find((c) => c.id === form.category);
 
+  useEffect(() => {
+    if (!session) {
+      navigate("/login");
+    }
+  }, [session, navigate]);
+
   // Keep form category synced if URL query parameter changes
   useEffect(() => {
     if (queryCat && ISSUE_CATEGORIES.some((c) => c.id === queryCat) && queryCat !== form.category) {

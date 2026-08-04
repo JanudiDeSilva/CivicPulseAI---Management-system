@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchReports, fetchStats, updateReportStatus } from "../services/api";
+import { fetchReports, fetchStats, updateReportStatus, updateReportReply } from "../services/api";
 import MapView from "../components/MapView";
 
 const CATEGORY_META = {
@@ -73,6 +73,10 @@ export default function Dashboard() {
   const [showMap, setShowMap]              = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(null);
   const [error, setError]                  = useState(null);
+  const [replyDrafts, setReplyDrafts]      = useState({});
+  const [replySaving, setReplySaving]      = useState(null);
+  const [replySuccess, setReplySuccess]    = useState(null);
+  const [expandedFlood, setExpandedFlood]  = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -139,11 +143,21 @@ export default function Dashboard() {
     }
   };
 
-  const handleReplySave = (reportId, replyText) => {
-    const stored = JSON.parse(localStorage.getItem("civic_pulse_user_complaints") || "[]");
-    const updated = stored.map((c) => (c.id === reportId ? { ...c, reply: replyText } : c));
-    localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
-    setComplaints(updated);
+  const handleReplySubmit = async (reportId) => {
+    const replyText = replyDrafts[reportId] ?? "";
+    setReplySaving(reportId);
+    try {
+      await updateReportReply(reportId, replyText);
+      setComplaints((prev) =>
+        prev.map((c) => (c.id === reportId ? { ...c, admin_reply: replyText } : c))
+      );
+      setReplySuccess(reportId);
+      setTimeout(() => setReplySuccess(null), 2500);
+    } catch (err) {
+      console.error("Reply save failed:", err);
+    } finally {
+      setReplySaving(null);
+    }
   };
 
   return (
@@ -343,12 +357,51 @@ export default function Dashboard() {
                           {[item.city, item.district].filter(Boolean).join(", ")}
                         </div>
                       </td>
-                      <td style={{ padding: "14px" }}>
+                      <td style={{ padding: "14px", minWidth: 180 }}>
                         <SeverityPill severity={item.severity} />
                         {item.priority_score > 0 && (
-                          <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: 3 }}>
-                            Score: {(item.priority_score * 100).toFixed(0)}%
+                          <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>
+                            Risk Score: <strong style={{color:"#cbd5e1"}}>{(item.priority_score * 100).toFixed(0)}%</strong>
                           </div>
+                        )}
+                        {item.category === "flood" && (
+                          <div style={{ marginTop: 6 }}>
+                            <button
+                              onClick={() => setExpandedFlood(expandedFlood === item.id ? null : item.id)}
+                              style={{ fontSize: "0.7rem", background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.4)", color: "#93c5fd", borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}
+                            >
+                              🤖 ML Details {expandedFlood === item.id ? "▲" : "▼"}
+                            </button>
+                            {expandedFlood === item.id && (
+                              <div style={{ marginTop: 6, padding: "10px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 8, fontSize: "0.75rem" }}>
+                                <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 6, fontSize: "0.78rem" }}>🌊 XGBoost Flood AI Model</div>
+                                <div style={{ display: "grid", gap: 4 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                    <span style={{ color: "#64748b" }}>Flood Risk Level:</span>
+                                    <span style={{ color: item.severity === "CRITICAL" ? "#ef4444" : item.severity === "HIGH" ? "#f97316" : "#eab308", fontWeight: 700 }}>{item.severity}</span>
+                                  </div>
+                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                    <span style={{ color: "#64748b" }}>Flood Probability:</span>
+                                    <span style={{ color: "#f8fafc", fontWeight: 600 }}>{(item.priority_score * 100).toFixed(1)}%</span>
+                                  </div>
+                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                    <span style={{ color: "#64748b" }}>Flood Predicted:</span>
+                                    <span style={{ color: item.predicted_escalation === "YES" ? "#ef4444" : "#4ade80", fontWeight: 700 }}>{item.predicted_escalation || "—"}</span>
+                                  </div>
+                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                    <span style={{ color: "#64748b" }}>Confidence:</span>
+                                    <span style={{ color: "#f8fafc" }}>{item.escalation_confidence ? (item.escalation_confidence * 100).toFixed(0) + "%" : "—"}</span>
+                                  </div>
+                                </div>
+                                <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(59,130,246,0.2)", color: "#64748b", fontSize: "0.72rem" }}>
+                                  📡 Model inputs: district geo-features, live 7-day rainfall from Open-Meteo, elevation, distance to river, soil type, NDVI/NDWI indices & population density.
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {item.category !== "flood" && item.predicted_escalation === "YES" && (
+                          <div style={{ fontSize: "0.7rem", color: "#f87171", marginTop: 3 }}>⚠ Escalation Risk</div>
                         )}
                       </td>
                       <td style={{ padding: "14px" }}>
@@ -370,11 +423,15 @@ export default function Dashboard() {
                           <option value="Closed">Closed</option>
                         </select>
                       </td>
-                      <td style={{ padding: "14px" }}>
+                      <td style={{ padding: "14px", minWidth: 200 }}>
+                        {item.admin_reply && replySaving !== item.id && (
+                          <div style={{ fontSize: "0.72rem", color: "#4ade80", marginBottom: 4 }}>✓ Reply sent to user</div>
+                        )}
                         <textarea
                           rows={2}
-                          defaultValue={item.reply || ""}
-                          onBlur={(e) => handleReplySave(item.id, e.target.value)}
+                          value={replyDrafts[item.id] !== undefined ? replyDrafts[item.id] : (item.admin_reply || "")}
+                          onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                          placeholder="Type a reply to the citizen…"
                           style={{
                             width: "100%",
                             minWidth: 180,
@@ -384,9 +441,31 @@ export default function Dashboard() {
                             borderRadius: 8,
                             padding: "8px 10px",
                             fontSize: "0.78rem",
-                            resize: "vertical"
+                            resize: "vertical",
+                            display: "block"
                           }}
                         />
+                        <button
+                          onClick={() => handleReplySubmit(item.id)}
+                          disabled={replySaving === item.id}
+                          style={{
+                            marginTop: 6,
+                            width: "100%",
+                            padding: "6px 10px",
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            borderRadius: 7,
+                            border: "none",
+                            cursor: replySaving === item.id ? "not-allowed" : "pointer",
+                            background: replySuccess === item.id
+                              ? "rgba(34,197,94,0.25)"
+                              : "rgba(59,130,246,0.2)",
+                            color: replySuccess === item.id ? "#4ade80" : "#93c5fd",
+                            transition: "all 0.2s"
+                          }}
+                        >
+                          {replySaving === item.id ? "Sending…" : replySuccess === item.id ? "✓ Sent!" : "📨 Send Reply"}
+                        </button>
                       </td>
                       <td style={{ padding: "14px", fontSize: "0.78rem", color: "#94a3b8", whiteSpace: "nowrap" }}>
                         {item.submitted_at || "—"}
