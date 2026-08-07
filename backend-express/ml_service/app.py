@@ -7,16 +7,17 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-from ultralytics import YOLO
 
+ 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+ 
 
-from fastapi import UploadFile, File, Form
+from fastapi import UploadFile, File
 
-
+ 
 app = FastAPI(title="Flood Risk ML Service")
 
 app.add_middleware(
@@ -24,12 +25,13 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:8000",
+        "http://localhost:5173",  # ADDED: Vite dev server default port (needed for garbage classifier frontend)
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+ 
 
 model = None
 num_imputer = None
@@ -67,7 +69,7 @@ CATEGORICAL_COLS = [
     "water_supply", "electricity", "road_quality", "urban_rural",
 ]
 
-
+ 
 GARBAGE_MODEL = None
 GARBAGE_MODEL_LOADED = False
 GARBAGE_MODEL_LOAD_ERROR = None
