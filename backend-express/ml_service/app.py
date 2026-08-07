@@ -25,7 +25,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:8000",
-        "http://localhost:5173",  # ADDED: Vite dev server default port (needed for garbage classifier frontend)
+        "http://localhost:5173",  
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -74,11 +74,8 @@ GARBAGE_MODEL = None
 GARBAGE_MODEL_LOADED = False
 GARBAGE_MODEL_LOAD_ERROR = None
 
-# Must match the image size the model was actually trained at
-# (160x160 if you used the RAM-safe pipeline, 224x224 if you trained at full size)
-GARBAGE_IMG_SIZE = (160, 160)
+GARBAGE_IMG_SIZE = (224, 224)
 
-# Order must exactly match sorted(os.listdir(TRAIN_DIR)) from training
 GARBAGE_CLASS_NAMES = [
     "battery", "biological", "cardboard", "clothes", "glass",
     "metal", "paper", "plastic", "shoes", "trash",
@@ -124,10 +121,6 @@ def run_garbage_prediction(image_bytes: bytes) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Road damage (YOLOv8) — new section, same pattern as garbage above
-# ---------------------------------------------------------------------------
-
 ROAD_DAMAGE_MODEL = None
 ROAD_DAMAGE_MODEL_LOADED = False
 ROAD_DAMAGE_MODEL_LOAD_ERROR = None
@@ -135,7 +128,7 @@ ROAD_DAMAGE_MODEL_LOAD_ERROR = None
 ROAD_DAMAGE_CLASS_NAMES = {0: "pothole", 1: "crack", 2: "manhole"}
 ROAD_DAMAGE_CONF_THRESHOLDS = {"pothole": 0.35, "crack": 0.50, "manhole": 0.25}
 ROAD_DAMAGE_HAZARD_WEIGHT = {"pothole": 2.0, "crack": 1.0, "manhole": 3.0}
-ROAD_DAMAGE_IMGSZ = 960  # must match training resolution — do not change without retraining
+ROAD_DAMAGE_IMGSZ = 960 
 
 try:
     ROAD_DAMAGE_MODEL = YOLO("artifacts/road_damage/road_damage_yolov8.pt")
