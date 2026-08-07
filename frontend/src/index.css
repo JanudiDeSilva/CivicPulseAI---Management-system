@@ -348,6 +348,14 @@ p { color: var(--text-muted); }
   border-color: var(--border-highlight);
 }
 
+/* Map wrapper — no backdrop-filter (breaks Leaflet tile rendering) */
+.map-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
 /* =====================================================
    Category Badges
    ===================================================== */

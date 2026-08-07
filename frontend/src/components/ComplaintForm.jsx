@@ -494,13 +494,76 @@ export default function ComplaintForm() {
           }}
         >
           {/* Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-          <div>
-            <div className={`category-badge ${currentCategory.badgeClass}`} style={{ marginBottom: 12 }}>
-              <span>{currentCategory.icon}</span> {currentCategory.label}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchParams({}, { replace: true });
+                    setForm((prev) => ({ ...prev, category: "" }));
+                  }}
+                  className="btn btn-secondary"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 14px",
+                    fontSize: "0.85rem",
+                    borderRadius: 8,
+                    cursor: "pointer"
+                  }}
+                >
+                  ← Back to All Categories
+                </button>
+                <span className={`category-badge ${currentCategory.badgeClass}`} style={{ margin: 0 }}>
+                  <span>{currentCategory.icon}</span> {currentCategory.label}
+                </span>
+              </div>
+              <h2 style={{ fontSize: "1.75rem", margin: 0 }}>Lodge Citizen Complaint</h2>
+              <p style={{ marginTop: 4, color: "var(--text-muted)" }}>Select issue category and location details for fast municipal action.</p>
             </div>
-            <h2 style={{ fontSize: "1.75rem", margin: 0 }}>Lodge Citizen Complaint</h2>
-            <p style={{ marginTop: 4 }}>Select issue category and location details for fast municipal action.</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <select
+                className="form-select"
+                value={form.category}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    setSearchParams({ category: val }, { replace: true });
+                    setForm((prev) => ({ ...prev, category: val }));
+                  } else {
+                    setSearchParams({}, { replace: true });
+                    setForm((prev) => ({ ...prev, category: "" }));
+                  }
+                }}
+                style={{ fontSize: "0.85rem", padding: "6px 12px", width: "auto", cursor: "pointer" }}
+              >
+                <option value="">-- Change Category --</option>
+                {ISSUE_CATEGORIES.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.icon} {cat.label}
+                  </option>
+                ))}
+              </select>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  backgroundColor: currentCategory.bg,
+                  border: `1px solid ${currentCategory.border}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  transition: "all 0.3s ease",
+                  flexShrink: 0
+                }}
+              >
+                {currentCategory.icon}
+              </div>
+            </div>
           </div>
           <div
             style={{
@@ -520,6 +583,7 @@ export default function ComplaintForm() {
           </div>
         </div>
  
+
         {/* Optional GPS Location Auto-Detect Bar */}
         <div
           style={{
@@ -564,7 +628,7 @@ export default function ComplaintForm() {
           {/* Static Complaint Category Display (Dropdown removed as requested) */}
           <div className="form-group">
             <label className="form-label">
-              <span>📌</span> Category
+              Category
             </label>
             <div
               style={{
@@ -593,7 +657,7 @@ export default function ComplaintForm() {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">
-                <span>👤</span> Full Name *
+                Full Name *
               </label>
               <input
                 type="text"
@@ -608,7 +672,7 @@ export default function ComplaintForm() {
  
             <div className="form-group">
               <label className="form-label">
-                <span>📞</span> Contact Phone Number *
+                Contact Phone Number *
               </label>
               <input
                 type="tel"
@@ -626,7 +690,7 @@ export default function ComplaintForm() {
           <div className="grid-3">
             <div className="form-group">
               <label className="form-label">
-                <span>🏙️</span> District *
+                District *
               </label>
               <input
                 type="text"
@@ -641,7 +705,7 @@ export default function ComplaintForm() {
  
             <div className="form-group">
               <label className="form-label">
-                <span>🌆</span> City / Town *
+                City / Town *
               </label>
               <input
                 type="text"
@@ -656,7 +720,7 @@ export default function ComplaintForm() {
  
             <div className="form-group">
               <label className="form-label">
-                <span>📍</span> Specific Area / Suburb *
+                Specific Area / Suburb *
               </label>
               <input
                 type="text"
@@ -710,7 +774,7 @@ export default function ComplaintForm() {
               <div className="grid-2">
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>📏</span> Water Depth / Flood Level *
+                    Water Depth / Flood Level *
                   </label>
                   <select
                     name="floodDepth"
@@ -729,7 +793,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🚰</span> Primary Drainage Condition *
+                    Primary Drainage Condition *
                   </label>
                   <select
                     name="drainageStatus"
@@ -747,7 +811,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🏢</span> Primary Affected Zone *
+                    Primary Affected Zone *
                   </label>
                   <select
                     name="affectedImpact"
@@ -764,7 +828,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🏠</span> Is Water Entering Buildings/Houses? *
+                    Is Water Entering Buildings/Houses? *
                   </label>
                   <select
                     name="waterEntering"
@@ -785,7 +849,7 @@ export default function ComplaintForm() {
               <div className="grid-2">
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>♻️</span> Specific Type of Waste *
+                    Specific Type of Waste *
                   </label>
                   <select
                     name="wasteType"
@@ -803,7 +867,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🗑️</span> Waste Dump / Bin Condition *
+                    Waste Dump / Bin Condition *
                   </label>
                   <select
                     name="dumpsterStatus"
@@ -821,7 +885,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>⏱️</span> Uncollected Time Duration *
+                    Uncollected Time Duration *
                   </label>
                   <select
                     name="accumulationDuration"
@@ -838,7 +902,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>☣️</span> Primary Health & Environmental Hazard *
+                    Primary Health & Environmental Hazard *
                   </label>
                   <select
                     name="healthHazard"
@@ -860,7 +924,7 @@ export default function ComplaintForm() {
               <div className="grid-2">
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🛠️</span> Surface Damage Type *
+                    Surface Damage Type *
                   </label>
                   <select
                     name="damageType"
@@ -878,7 +942,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>📐</span> Estimated Pothole / Damage Size *
+                    Estimated Pothole / Damage Size *
                   </label>
                   <select
                     name="potholeSize"
@@ -895,7 +959,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🛣️</span> Road Type / Classification *
+                    Road Type / Classification *
                   </label>
                   <select
                     name="roadClass"
@@ -912,7 +976,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>⚠️</span> Immediate Hazard / Risk Level *
+                    Immediate Hazard / Risk Level *
                   </label>
                   <select
                     name="hazardLevel"
@@ -934,7 +998,7 @@ export default function ComplaintForm() {
               <div className="grid-2">
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🌐</span> Extent / Scope of Outage *
+                    Extent / Scope of Outage *
                   </label>
                   <select
                     name="outageScope"
@@ -951,7 +1015,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>⚡</span> Observed Electrical Fault *
+                    Observed Electrical Fault *
                   </label>
                   <select
                     name="outageSymptom"
@@ -969,7 +1033,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🔥</span> Critical Safety Hazard *
+                    Critical Safety Hazard *
                   </label>
                   <select
                     name="criticalDanger"
@@ -986,7 +1050,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>⏳</span> Duration of Current Outage *
+                    Duration of Current Outage *
                   </label>
                   <select
                     name="outageDuration"
@@ -1008,7 +1072,7 @@ export default function ComplaintForm() {
               <div className="grid-2">
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>💡</span> Lighting Fault Type *
+                    Lighting Fault Type *
                   </label>
                   <select
                     name="lightFault"
@@ -1026,7 +1090,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>📍</span> Fixtures Affected *
+                    Fixtures Affected *
                   </label>
                   <select
                     name="lightsCount"
@@ -1043,7 +1107,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🛡️</span> Dark Area Security Risk *
+                    Dark Area Security Risk *
                   </label>
                   <select
                     name="securityRisk"
@@ -1060,7 +1124,7 @@ export default function ComplaintForm() {
  
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    <span>🏷️</span> Pole ID Tag / Reference (Optional)
+                    Pole ID Tag / Reference (Optional)
                   </label>
                   <input
                     type="text"
@@ -1078,7 +1142,7 @@ export default function ComplaintForm() {
           {/* Complaint Description */}
           <div className="form-group">
             <label className="form-label">
-              <span>📝</span> Complaint Description &amp; Details *
+              Complaint Description &amp; Details *
             </label>
             <textarea
               name="description"
@@ -1094,7 +1158,7 @@ export default function ComplaintForm() {
           {/* Image / Attachment Upload */}
           <div className="form-group">
             <label className="form-label">
-              <span>📷</span> Upload Photo Evidence (Optional)
+              Upload Photo Evidence (Optional)
             </label>
             <div
               style={{
