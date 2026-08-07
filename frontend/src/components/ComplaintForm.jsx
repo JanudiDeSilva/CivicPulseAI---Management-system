@@ -565,23 +565,7 @@ export default function ComplaintForm() {
               </div>
             </div>
           </div>
-          <div
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 12,
-              backgroundColor: currentCategory.bg,
-              border: `1px solid ${currentCategory.border}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 24,
-              transition: "all 0.3s ease"
-            }}
-          >
-            {currentCategory.icon}
-          </div>
-        </div>
+
  
 
         {/* Optional GPS Location Auto-Detect Bar */}
