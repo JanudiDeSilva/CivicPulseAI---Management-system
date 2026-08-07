@@ -1,7 +1,6 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { fetchMapPins } from "../services/api";
 
-// ─── Leaflet is loaded via CDN in index.html style / via npm ─────────────────
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -41,25 +40,42 @@ function PulseFitBounds({ pins }) {
   return null;
 }
 
+/** Leaflet needs invalidateSize after the container becomes visible / resizes. */
+function MapResizeFix({ trigger }) {
+  const map = useMap();
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      map.invalidateSize();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [map, trigger]);
+  return null;
+}
+
 export default function MapView() {
   const [pins, setPins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Default center: Sri Lanka
   const DEFAULT_CENTER = [7.8731, 80.7718];
   const DEFAULT_ZOOM = 7;
 
-  useEffect(() => {
+  const loadPins = () => {
+    setLoading(true);
+    setError(null);
     fetchMapPins()
       .then((res) => {
         setPins(res.data.pins || []);
       })
       .catch((err) => {
         console.error("Map pins fetch failed:", err);
-        setError("Could not load map data.");
+        setError("Could not load map pins. The map is still visible — try refreshing pins.");
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadPins();
   }, []);
 
   const pinsWithCoords = pins.filter(
@@ -67,8 +83,10 @@ export default function MapView() {
            !isNaN(p.latitude) && !isNaN(p.longitude)
   );
 
+  const showEmptyOverlay = !loading && !error && pinsWithCoords.length === 0;
+
   return (
-    <div className="glass-card" style={{ padding: 0, overflow: "hidden", borderRadius: 16 }}>
+    <div className="map-card" style={{ padding: 0, overflow: "hidden", borderRadius: 16 }}>
       {/* Header */}
       <div style={{ padding: "16px 22px", borderBottom: "1px solid #1e3058", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
@@ -90,22 +108,37 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* Map */}
-      {error ? (
-        <div style={{ height: 400, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🗺️</div>
-            <p>{error}</p>
-            <p style={{ fontSize: "0.8rem" }}>Submit complaints with GPS to see pins here.</p>
-          </div>
+      {error && (
+        <div style={{
+          padding: "10px 22px",
+          background: "rgba(239,68,68,0.12)",
+          borderBottom: "1px solid rgba(239,68,68,0.25)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}>
+          <p style={{ margin: 0, fontSize: "0.82rem", color: "#fca5a5" }}>{error}</p>
+          <button
+            type="button"
+            onClick={loadPins}
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "5px 12px", flexShrink: 0 }}
+          >
+            Retry
+          </button>
         </div>
-      ) : (
+      )}
+
+      {/* Map — always mounted so Leaflet tiles stay visible */}
+      <div style={{ position: "relative", height: 440 }}>
         <MapContainer
           center={DEFAULT_CENTER}
           zoom={DEFAULT_ZOOM}
-          style={{ height: 440, width: "100%", background: "#0b1120" }}
+          style={{ height: "100%", width: "100%", background: "#0b1120" }}
           zoomControl={true}
         >
+          <MapResizeFix trigger={loading} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
@@ -157,23 +190,22 @@ export default function MapView() {
               </CircleMarker>
             );
           })}
-
-          {/* Empty state overlay when no GPS pins */}
-          {!loading && pinsWithCoords.length === 0 && (
-            <div style={{
-              position: "absolute", inset: 0, zIndex: 1000,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: "rgba(11,17,32,0.65)", pointerEvents: "none"
-            }}>
-              <div style={{ textAlign: "center", color: "#94a3b8" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
-                <p style={{ margin: 0 }}>No geotagged reports yet.</p>
-                <p style={{ fontSize: "0.8rem", margin: "4px 0 0" }}>Submit a complaint with GPS location to see pins.</p>
-              </div>
-            </div>
-          )}
         </MapContainer>
-      )}
+
+        {showEmptyOverlay && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(11,17,32,0.55)", pointerEvents: "none",
+          }}>
+            <div style={{ textAlign: "center", color: "#94a3b8" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
+              <p style={{ margin: 0 }}>No geotagged reports yet.</p>
+              <p style={{ fontSize: "0.8rem", margin: "4px 0 0" }}>Submit a complaint with GPS location to see pins.</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

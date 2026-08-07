@@ -175,9 +175,7 @@ export default function AuthPage() {
               {loading ? "Signing in..." : "Sign In to Portal"}
             </button>
 
-            <div className="hint-box">
-              <strong>Temporary Admin Access:</strong> onethrajanu2003@gmail.com / janudi
-            </div>
+
           </form>
         ) : (
           <form onSubmit={handleSignUp} className="auth-form">
@@ -264,10 +262,6 @@ export default function AuthPage() {
             <button className="btn btn-primary auth-cta" type="submit" disabled={loading}>
               {loading ? "Registering..." : "Register"}
             </button>
-
-            <div className="hint-box">
-              <strong>Note:</strong> Admin signup is temporarily disabled. Use the seeded admin account for portal testing.
-            </div>
           </form>
         )}
       </div>
