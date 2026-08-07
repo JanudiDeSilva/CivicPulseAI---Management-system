@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import AuthPage from "./pages/AuthPage";
 import UserPortal from "./pages/UserPortal";
 import NotFound from "./pages/NotFound";
+import GarbageClassifier from "./components/GarbageClassifier";
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route path="/garbage-test" element={<GarbageClassifier />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
