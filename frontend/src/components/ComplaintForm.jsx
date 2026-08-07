@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { submitComplaint } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-
+ 
 const ISSUE_CATEGORIES = [
   {
     id: "flood",
@@ -55,15 +55,15 @@ const ISSUE_CATEGORIES = [
     description: "Non-functional streetlights, dark road stretches, flickering lighting poles"
   }
 ];
-
+ 
 export default function ComplaintForm() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-
+ 
   const queryCat = searchParams.get("category");
   const initialCategory = ISSUE_CATEGORIES.some((c) => c.id === queryCat) ? queryCat : "";
-
+ 
   const [form, setForm] = useState({
     category: initialCategory,
     name: "",
@@ -73,64 +73,80 @@ export default function ComplaintForm() {
     area: "",
     description: ""
   });
-
+ 
   const [categoryDetails, setCategoryDetails] = useState({
     // Flood
     floodDepth: "Knee Deep (1 - 2 ft)",
     drainageStatus: "Blocked Storm Drain / Drain Grate",
     affectedImpact: "Residential Houses & Yard Areas",
     waterEntering: "Yes - Ground Floor Inundated",
-
+ 
     // Garbage
     wasteType: "Household Organic & Food Waste",
     dumpsterStatus: "Overflowing Municipal Trash Bin",
     accumulationDuration: "3 - 5 Days",
     healthHazard: "Severe Foul Odor & Pest Infestation (Flies/Rats)",
-
+ 
     // Road Damage
     damageType: "Deep Pothole / Crater",
     potholeSize: "Medium (1 - 3 feet wide)",
     roadClass: "Main Arterial Road / Expressway",
     hazardLevel: "Extreme Hazard for Motorcycles / Bicycles",
-
+ 
     // Power Failure
     outageScope: "Entire Street / Neighborhood Block",
     outageSymptom: "Total Power Blackout (No Supply)",
     criticalDanger: "No Immediate Wire Hazard",
     outageDuration: "1 - 3 Hours",
-
+ 
     // Street Light
     lightFault: "Streetlight Completely Dark / Out",
     lightsCount: "Entire Street Block / Dark Road",
     securityRisk: "Dark Alley / High Crime Vulnerability",
     poleTag: ""
   });
-
+ 
   const [location, setLocation] = useState(null);
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState("");
-
+ 
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(null);
   const [countdown, setCountdown] = useState(5);
-
+ 
+  // --- ADDED: AI garbage classification state ---
+  const [garbageResult, setGarbageResult] = useState(null);
+  const [garbageLoading, setGarbageLoading] = useState(false);
+  const [garbageError, setGarbageError] = useState(null);
+  const GARBAGE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  // --- END ADDED ---
+ 
   const currentCategory = ISSUE_CATEGORIES.find((c) => c.id === form.category);
-
+ 
   useEffect(() => {
     if (!session) {
       navigate("/login");
     }
   }, [session, navigate]);
-
+ 
   // Keep form category synced if URL query parameter changes
   useEffect(() => {
     if (queryCat && ISSUE_CATEGORIES.some((c) => c.id === queryCat) && queryCat !== form.category) {
       setForm((prev) => ({ ...prev, category: queryCat }));
     }
   }, [queryCat]);
-
+ 
+  // --- ADDED: clear AI result if the user switches away from the Garbage category ---
+  useEffect(() => {
+    if (form.category !== "garbage") {
+      setGarbageResult(null);
+      setGarbageError(null);
+    }
+  }, [form.category]);
+  // --- END ADDED ---
+ 
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "category") {
@@ -138,12 +154,12 @@ export default function ComplaintForm() {
     }
     setForm((prev) => ({ ...prev, [name]: value }));
   };
-
+ 
   const handleDetailChange = (e) => {
     const { name, value } = e.target;
     setCategoryDetails((prev) => ({ ...prev, [name]: value }));
   };
-
+ 
   // Helper to format category-specific summary string for storage & display
   const getCategorySpecificSummary = () => {
     switch (form.category) {
@@ -161,7 +177,7 @@ export default function ComplaintForm() {
         return "";
     }
   };
-
+ 
   // Auto-redirect timer to Home page after submission
   useEffect(() => {
     let timer;
@@ -179,23 +195,23 @@ export default function ComplaintForm() {
     }
     return () => clearInterval(timer);
   }, [submissionSuccess, navigate]);
-
+ 
   // GPS Geolocation Handler - Optional Current Location Auto-Detect
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
       setLocationStatus("Geolocation is not supported by your browser");
       return;
     }
-
+ 
     setLocating(true);
     setLocationStatus("Detecting GPS coordinates...");
-
+ 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
         setLocation({ latitude: lat, longitude: lon });
-
+ 
         try {
           setLocationStatus("Fetching location details...");
           const geoRes = await fetch(
@@ -211,14 +227,14 @@ export default function ComplaintForm() {
               address.district ||
               address.state ||
               "";
-
+ 
             const detectedCity =
               address.city ||
               address.town ||
               address.municipality ||
               address.city_district ||
               "";
-
+ 
             const detectedArea =
               address.suburb ||
               address.neighbourhood ||
@@ -227,19 +243,19 @@ export default function ComplaintForm() {
               address.quarter ||
               geoData.name ||
               "";
-
+ 
             setForm((prev) => ({
               ...prev,
               district: detectedDistrict || prev.district,
               city: detectedCity || prev.city,
               area: detectedArea || prev.area
             }));
-
+ 
             const details = [];
             if (detectedDistrict) details.push(`District: ${detectedDistrict}`);
             if (detectedCity) details.push(`City: ${detectedCity}`);
             if (detectedArea) details.push(`Area: ${detectedArea}`);
-
+ 
             setLocationStatus(
               details.length > 0
                 ? `📍 Synced: ${details.join(" | ")}`
@@ -263,37 +279,75 @@ export default function ComplaintForm() {
       { timeout: 10000, enableHighAccuracy: true }
     );
   };
-
+ 
+  // --- ADDED: run the uploaded photo through the AI garbage classifier ---
+  const classifyGarbagePhoto = async (file) => {
+    setGarbageLoading(true);
+    setGarbageError(null);
+    setGarbageResult(null);
+ 
+    const formData = new FormData();
+    formData.append("file", file);
+ 
+    try {
+      const res = await fetch(`${GARBAGE_API_URL}/predict-garbage`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+ 
+      if (data.error) {
+        setGarbageError(data.error);
+      } else {
+        setGarbageResult(data);
+      }
+    } catch (err) {
+      setGarbageError("Could not reach AI classification service");
+    } finally {
+      setGarbageLoading(false);
+    }
+  };
+  // --- END ADDED ---
+ 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setPhoto(file);
       setPhotoPreview(URL.createObjectURL(file));
+ 
+      // --- ADDED: auto-run AI garbage classification, only for the Garbage category ---
+      if (form.category === "garbage") {
+        classifyGarbagePhoto(file);
+      } else {
+        setGarbageResult(null);
+        setGarbageError(null);
+      }
+      // --- END ADDED ---
     }
   };
-
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
+ 
     const trackingId = "CP-" + Math.floor(100000 + Math.random() * 900000);
     const specificSummary = getCategorySpecificSummary();
-
+ 
     const data = new FormData();
     Object.keys(form).forEach((key) => {
       data.append(key, form[key]);
     });
     data.append("specific_details", specificSummary);
-
+ 
     if (location) {
       data.append("latitude", location.latitude);
       data.append("longitude", location.longitude);
     }
-
+ 
     if (photo) {
       data.append("photo", photo);
     }
-
+ 
     // Persist ticket details to localStorage for Admin Dashboard
     const newComplaintRecord = {
       id: trackingId,
@@ -314,7 +368,7 @@ export default function ComplaintForm() {
       status: "Registered",
       submitted_at: "Just now"
     };
-
+ 
     // Persist to localStorage for instant optimistic update on Dashboard
     try {
       const storedStr = localStorage.getItem("civic_pulse_user_complaints");
@@ -326,12 +380,12 @@ export default function ComplaintForm() {
     } catch (err) {
       console.warn("Storage sync warning:", err);
     }
-
+ 
     try {
       // POST to real backend — get AI triage result
       const response = await submitComplaint(data);
       const serverData = response.data;
-
+ 
       // Update localStorage record with server-assigned values
       try {
         const storedStr = localStorage.getItem("civic_pulse_user_complaints");
@@ -348,7 +402,7 @@ export default function ComplaintForm() {
         );
         localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
       } catch (_) {}
-
+ 
       setLoading(false);
       setCountdown(5);
       setSubmissionSuccess({
@@ -387,11 +441,11 @@ export default function ComplaintForm() {
       });
     }
   };
-
+ 
   const handleRedirectNow = () => {
     navigate("/");
   };
-
+ 
   return (
     <div style={{ maxWidth: 840, margin: "0 auto" }}>
       {!currentCategory && !submissionSuccess ? (
@@ -465,7 +519,7 @@ export default function ComplaintForm() {
             {currentCategory.icon}
           </div>
         </div>
-
+ 
         {/* Optional GPS Location Auto-Detect Bar */}
         <div
           style={{
@@ -490,7 +544,7 @@ export default function ComplaintForm() {
               {locationStatus || "Reporting from the incident site? Click to auto-fill location, or type location manually below."}
             </p>
           </div>
-
+ 
           <button
             type="button"
             onClick={handleGetLocation}
@@ -505,7 +559,7 @@ export default function ComplaintForm() {
             {locating ? "🛰️ Detecting..." : location ? "✓ Current Location Synced" : "📍 Auto-Detect My Location"}
           </button>
         </div>
-
+ 
         <form onSubmit={handleSubmit}>
           {/* Static Complaint Category Display (Dropdown removed as requested) */}
           <div className="form-group">
@@ -534,7 +588,7 @@ export default function ComplaintForm() {
               </span>
             </div>
           </div>
-
+ 
           {/* Citizen Details */}
           <div className="grid-2">
             <div className="form-group">
@@ -551,7 +605,7 @@ export default function ComplaintForm() {
                 className="form-input"
               />
             </div>
-
+ 
             <div className="form-group">
               <label className="form-label">
                 <span>📞</span> Contact Phone Number *
@@ -567,7 +621,7 @@ export default function ComplaintForm() {
               />
             </div>
           </div>
-
+ 
           {/* Location Details: District, City, and Specific Area */}
           <div className="grid-3">
             <div className="form-group">
@@ -584,7 +638,7 @@ export default function ComplaintForm() {
                 className="form-input"
               />
             </div>
-
+ 
             <div className="form-group">
               <label className="form-label">
                 <span>🌆</span> City / Town *
@@ -599,7 +653,7 @@ export default function ComplaintForm() {
                 className="form-input"
               />
             </div>
-
+ 
             <div className="form-group">
               <label className="form-label">
                 <span>📍</span> Specific Area / Suburb *
@@ -615,7 +669,7 @@ export default function ComplaintForm() {
               />
             </div>
           </div>
-
+ 
           {/* DYNAMIC CATEGORY-SPECIFIC FORM FIELDS */}
           <div
             style={{
@@ -650,7 +704,7 @@ export default function ComplaintForm() {
                 Category Dynamic Form
               </span>
             </div>
-
+ 
             {/* FLOOD SPECIFIC FIELDS */}
             {form.category === "flood" && (
               <div className="grid-2">
@@ -672,7 +726,7 @@ export default function ComplaintForm() {
                     </option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>🚰</span> Primary Drainage Condition *
@@ -690,7 +744,7 @@ export default function ComplaintForm() {
                     <option value="Flash Flood Surface Runoff">Flash Flood Surface Runoff</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>🏢</span> Primary Affected Zone *
@@ -707,7 +761,7 @@ export default function ComplaintForm() {
                     <option value="School or Medical Center Access">School or Medical Center Access</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>🏠</span> Is Water Entering Buildings/Houses? *
@@ -725,7 +779,7 @@ export default function ComplaintForm() {
                 </div>
               </div>
             )}
-
+ 
             {/* GARBAGE & WASTE SPECIFIC FIELDS */}
             {form.category === "garbage" && (
               <div className="grid-2">
@@ -746,7 +800,7 @@ export default function ComplaintForm() {
                     <option value="Dead Animal Carcass">Dead Animal Carcass</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>🗑️</span> Waste Dump / Bin Condition *
@@ -764,7 +818,7 @@ export default function ComplaintForm() {
                     <option value="Open Burning Waste Hazard">Open Burning Waste Hazard</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>⏱️</span> Uncollected Time Duration *
@@ -781,7 +835,7 @@ export default function ComplaintForm() {
                     <option value="Chronic Ongoing Dumping Site (> 1 Month)">Chronic Ongoing Dumping Site (&gt; 1 Month)</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>☣️</span> Primary Health & Environmental Hazard *
@@ -800,7 +854,7 @@ export default function ComplaintForm() {
                 </div>
               </div>
             )}
-
+ 
             {/* ROAD DAMAGE SPECIFIC FIELDS */}
             {form.category === "road_damage" && (
               <div className="grid-2">
@@ -821,7 +875,7 @@ export default function ComplaintForm() {
                     <option value="Loose Gravel / Hazardous Debris">Loose Gravel / Hazardous Debris</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>📐</span> Estimated Pothole / Damage Size *
@@ -838,7 +892,7 @@ export default function ComplaintForm() {
                     <option value="Multi-lane Hazardous Stretch">Multi-lane Hazardous Stretch</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>🛣️</span> Road Type / Classification *
@@ -855,7 +909,7 @@ export default function ComplaintForm() {
                     <option value="Bridge / Flyover Access Ramp">Bridge / Flyover Access Ramp</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>⚠️</span> Immediate Hazard / Risk Level *
@@ -874,7 +928,7 @@ export default function ComplaintForm() {
                 </div>
               </div>
             )}
-
+ 
             {/* POWER FAILURE SPECIFIC FIELDS */}
             {form.category === "power_failure" && (
               <div className="grid-2">
@@ -894,7 +948,7 @@ export default function ComplaintForm() {
                     <option value="Substation Feeder Level Blackout">Substation Feeder Level Blackout</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>⚡</span> Observed Electrical Fault *
@@ -912,7 +966,7 @@ export default function ComplaintForm() {
                     <option value="Frequent Intermittent Tripping">Frequent Intermittent Tripping</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>🔥</span> Critical Safety Hazard *
@@ -929,7 +983,7 @@ export default function ComplaintForm() {
                     <option value="No Immediate Wire Hazard">No Immediate Wire Hazard</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>⏳</span> Duration of Current Outage *
@@ -948,7 +1002,7 @@ export default function ComplaintForm() {
                 </div>
               </div>
             )}
-
+ 
             {/* BROKEN STREET LIGHT SPECIFIC FIELDS */}
             {form.category === "street_light" && (
               <div className="grid-2">
@@ -969,7 +1023,7 @@ export default function ComplaintForm() {
                     <option value="Light ON continuously during day">Light ON continuously during day</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>📍</span> Fixtures Affected *
@@ -986,7 +1040,7 @@ export default function ComplaintForm() {
                     <option value="Public Park / Community Area">Public Park / Community Area</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>🛡️</span> Dark Area Security Risk *
@@ -1003,7 +1057,7 @@ export default function ComplaintForm() {
                     <option value="Standard Residential Street">Standard Residential Street</option>
                   </select>
                 </div>
-
+ 
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
                     <span>🏷️</span> Pole ID Tag / Reference (Optional)
@@ -1020,7 +1074,7 @@ export default function ComplaintForm() {
               </div>
             )}
           </div>
-
+ 
           {/* Complaint Description */}
           <div className="form-group">
             <label className="form-label">
@@ -1036,7 +1090,7 @@ export default function ComplaintForm() {
               className="form-textarea"
             />
           </div>
-
+ 
           {/* Image / Attachment Upload */}
           <div className="form-group">
             <label className="form-label">
@@ -1083,8 +1137,37 @@ export default function ComplaintForm() {
                 )}
               </label>
             </div>
+ 
+            {/* --- ADDED: AI garbage classification result (only shown for the Garbage category) --- */}
+            {form.category === "garbage" && garbageLoading && (
+              <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: 8 }}>
+                🤖 Analyzing photo with AI...
+              </p>
+            )}
+            {form.category === "garbage" && garbageError && (
+              <p style={{ fontSize: "0.85rem", color: "#f87171", marginTop: 8 }}>
+                AI check unavailable: {garbageError}
+              </p>
+            )}
+            {form.category === "garbage" && garbageResult && (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  backgroundColor: "rgba(5, 150, 105, 0.1)",
+                  border: "1px solid rgba(16, 185, 129, 0.4)",
+                  fontSize: "0.85rem",
+                  color: "#f8fafc"
+                }}
+              >
+                🤖 AI Detected: <strong>{garbageResult.predicted_class}</strong>{" "}
+                ({(garbageResult.confidence * 100).toFixed(1)}% confidence)
+              </div>
+            )}
+            {/* --- END ADDED --- */}
           </div>
-
+ 
           {/* Submit Button */}
           <button
             type="submit"
@@ -1104,7 +1187,7 @@ export default function ComplaintForm() {
         </form>
         </div>
       ) : null}
-
+ 
       {/* Success Modal Pop-up with Auto-Redirect */}
       {submissionSuccess && (
         <div
@@ -1152,15 +1235,15 @@ export default function ComplaintForm() {
             >
               ✅
             </div>
-
+ 
             <h3 style={{ fontSize: "1.75rem", margin: "0 0 8px", color: "#f8fafc" }}>
               Complaint Submitted Successfully!
             </h3>
-
+ 
             <p style={{ fontSize: "0.95rem", color: "#94a3b8", marginBottom: 16 }}>
               Your ticket details have been dispatched and added to the Admin Dashboard.
             </p>
-
+ 
             <div
               style={{
                 backgroundColor: "rgba(59, 130, 246, 0.12)",
@@ -1174,7 +1257,7 @@ export default function ComplaintForm() {
             >
               🏠 Redirecting to Home Page in <strong>{countdown} seconds...</strong>
             </div>
-
+ 
             {/* Complaint Summary Pill */}
             <div
               style={{
@@ -1241,7 +1324,7 @@ export default function ComplaintForm() {
                 </div>
               )}
             </div>
-
+ 
             <button
               type="button"
               onClick={handleRedirectNow}
