@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useLang } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
+import { fetchStats } from "../services/api";
 
 const CATEGORIES = [
   {
@@ -45,16 +47,19 @@ const CATEGORIES = [
   }
 ];
 
-const STATS = [
-  { value: "12,400+", labelKey: "home_stats_complaints", icon: "📋" },
-  { value: "38 min", labelKey: "home_stats_response", icon: "⏱️" },
-  { value: "94%", labelKey: "home_stats_resolved", icon: "✅" },
-  { value: "25", labelKey: "home_stats_districts", icon: "🗺️" },
-];
-
 export default function Home() {
   const { t, lang } = useLang();
   const { session } = useAuth();
+
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStats()
+      .then((res) => setStats(res.data))
+      .catch(() => setStats(null))
+      .finally(() => setStatsLoading(false));
+  }, []);
 
   return (
     <div style={{ textAlign: "center", maxWidth: 1100, margin: "0 auto" }}>
@@ -108,11 +113,45 @@ export default function Home() {
             gap: 16
           }}
         >
-          {STATS.map((s) => (
-            <div key={s.labelKey} style={{ textAlign: "center", minWidth: 110 }}>
+          {[
+            {
+              icon: "📋",
+              value: statsLoading ? null : stats ? stats.total_reports.toLocaleString() : "—",
+              label: t("home_stats_complaints"),
+            },
+            {
+              icon: "✅",
+              value: statsLoading ? null : stats ? `${stats.resolved_percent}%` : "—",
+              label: t("home_stats_resolved"),
+            },
+            {
+              icon: "📂",
+              value: statsLoading ? null : stats ? stats.open_count.toLocaleString() : "—",
+              label: "Active Cases",
+            },
+            {
+              icon: "🗺️",
+              value: statsLoading ? null : stats ? stats.districts_covered : "—",
+              label: t("home_stats_districts"),
+            },
+          ].map((s) => (
+            <div key={s.label} style={{ textAlign: "center", minWidth: 110 }}>
               <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text-main)" }}>{s.value}</div>
-              <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", fontWeight: 500 }}>{t(s.labelKey)}</div>
+              <div style={{
+                fontSize: "1.6rem", fontWeight: 800, color: "var(--text-main)",
+                minWidth: 60, minHeight: "2rem",
+                display: "flex", alignItems: "center", justifyContent: "center"
+              }}>
+                {s.value === null ? (
+                  <span style={{
+                    display: "inline-block", width: 60, height: 28,
+                    borderRadius: 6,
+                    background: "rgba(56,189,248,0.08)",
+                    animation: "pulse 1.4s ease-in-out infinite"
+                  }} />
+                ) : s.value}
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", fontWeight: 500 }}>{s.label}</div>
             </div>
           ))}
         </div>

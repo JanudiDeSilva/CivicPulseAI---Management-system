@@ -51,11 +51,47 @@ function GarbageClassifier() {
       <input type="file" accept="image/*" onChange={handleFileChange} />
 
       {preview && (
-        <img
-          src={preview}
-          alt="preview"
-          style={{ maxWidth: "100%", marginTop: 12, borderRadius: 8 }}
-        />
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={() => {
+                setPreview(null);
+                setResult(null);
+                setError(null);
+                const fileInput = document.querySelector('input[type="file"]');
+                if (fileInput) {
+                  fileInput.value = "";
+                }
+              }}
+              style={{
+                background: "rgba(239, 68, 68, 0.2)",
+                color: "#f87171",
+                border: "1px solid rgba(239, 68, 68, 0.4)",
+                borderRadius: 6,
+                padding: "4px 10px",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = "rgba(239, 68, 68, 0.35)";
+                e.target.style.color = "#fca5a5";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = "rgba(239, 68, 68, 0.2)";
+                e.target.style.color = "#f87171";
+              }}
+            >
+              ✕ Detach
+            </button>
+          </div>
+          <img
+            src={preview}
+            alt="preview"
+            style={{ maxWidth: "100%", marginTop: 8, borderRadius: 8 }}
+          />
+        </div>
       )}
 
       {loading && <p>Classifying image...</p>}

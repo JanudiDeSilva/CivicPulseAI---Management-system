@@ -32,7 +32,20 @@ const Report = sequelize.define("Report", {
 
     status: { type: DataTypes.STRING, defaultValue: "Registered" },
     admin_reply: { type: DataTypes.TEXT, allowNull: true },
-
+    // Numeric model input fields
+    elevation_m: DataTypes.FLOAT,
+    distance_to_river_m: DataTypes.FLOAT,
+    population_density_per_km2: DataTypes.FLOAT,
+    built_up_percent: DataTypes.FLOAT,
+    rainfall_7d_mm: DataTypes.FLOAT,
+    monthly_rainfall_mm: DataTypes.FLOAT,
+    ndvi: DataTypes.FLOAT,
+    ndwi: DataTypes.FLOAT,
+    water_presence_flag: DataTypes.FLOAT,
+    historical_flood_count: DataTypes.FLOAT,
+    infrastructure_score: DataTypes.FLOAT,
+    nearest_hospital_km: DataTypes.FLOAT,
+    nearest_evac_km: DataTypes.FLOAT,
     incident_id: { type: DataTypes.UUID, allowNull: true },
 }, {
     tableName: "reports",

@@ -21,11 +21,11 @@ const initialLogin = {
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { signupUser, requestOtp, loginWithPassword, session } = useAuth();
+  const { signupUser, loginWithPassword, session } = useAuth();
   const [mode, setMode] = useState("signin");
   const [signupForm, setSignupForm] = useState(initialSignup);
   const [loginForm, setLoginForm] = useState(initialLogin);
-  const [otpMessage, setOtpMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -35,15 +35,6 @@ export default function AuthPage() {
     }
   }, [session, navigate]);
 
-  const handleSendOtp = (email) => {
-    try {
-      const payload = requestOtp(email);
-      setOtpMessage(`Demo email verification code sent to ${payload.email}. Use code: ${payload.otp}`);
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    }
-  };
 
   const handleSignUp = async (event) => {
     event.preventDefault();
@@ -52,7 +43,7 @@ export default function AuthPage() {
       setError("");
       signupUser(signupForm);
       setMode("signin");
-      setOtpMessage("Registration complete. Please sign in with your new email and password.");
+      setSuccessMessage("Registration complete. Please sign in with your new credentials.");
       setSignupForm(initialSignup);
     } catch (err) {
       setError(err.message);
@@ -112,7 +103,7 @@ export default function AuthPage() {
         </div>
 
         {error && <div className="auth-error">{error}</div>}
-        {otpMessage && <div className="auth-success">{otpMessage}</div>}
+        {successMessage && <div className="auth-success">{successMessage}</div>}
 
         {mode === "signin" ? (
           <form onSubmit={handleSignIn} className="auth-form">
@@ -163,13 +154,7 @@ export default function AuthPage() {
               />
             </label>
 
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => handleSendOtp(loginForm.email || "onethrajanu2003@gmail.com")}
-            >
-              Send OTP Demo
-            </button>
+
 
             <button className="btn btn-primary auth-cta" type="submit" disabled={loading}>
               {loading ? "Signing in..." : "Sign In to Portal"}
