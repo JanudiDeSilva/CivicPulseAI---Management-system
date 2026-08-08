@@ -2,12 +2,19 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { submitComplaint } from "../services/api";
 import { useAuth } from "../context/AuthContext";
- 
+
+import floodImg from "../assets/flood.jpeg";
+import roadDamageImg from "../assets/road_damage.png";
+import garbageImg from "../assets/bins.jpeg";
+import powerFailureImg from "../assets/power failure.jpg";
+import streetLightImg from "../assets/light.jpeg";
+
 const ISSUE_CATEGORIES = [
   {
     id: "flood",
     label: "Flood & Drainage Issue",
     icon: "🌊",
+    image: floodImg,
     color: "#2563eb",
     bg: "rgba(37, 99, 235, 0.12)",
     border: "rgba(59, 130, 246, 0.4)",
@@ -18,6 +25,7 @@ const ISSUE_CATEGORIES = [
     id: "road_damage",
     label: "Road Damage & Potholes",
     icon: "🚗",
+    image: roadDamageImg,
     color: "#d97706",
     bg: "rgba(217, 119, 6, 0.12)",
     border: "rgba(245, 158, 11, 0.4)",
@@ -28,6 +36,7 @@ const ISSUE_CATEGORIES = [
     id: "garbage",
     label: "Garbage & Waste Management",
     icon: "🗑️",
+    image: garbageImg,
     color: "#059669",
     bg: "rgba(5, 150, 105, 0.12)",
     border: "rgba(16, 185, 129, 0.4)",
@@ -38,6 +47,7 @@ const ISSUE_CATEGORIES = [
     id: "power_failure",
     label: "Power Failure & Outage",
     icon: "⚡",
+    image: powerFailureImg,
     color: "#7c3aed",
     bg: "rgba(124, 58, 237, 0.12)",
     border: "rgba(139, 92, 246, 0.4)",
@@ -48,6 +58,7 @@ const ISSUE_CATEGORIES = [
     id: "street_light",
     label: "Broken Street Light & Lighting",
     icon: "💡",
+    image: streetLightImg,
     color: "#eab308",
     bg: "rgba(234, 179, 8, 0.12)",
     border: "rgba(250, 204, 21, 0.4)",
@@ -453,7 +464,7 @@ export default function ComplaintForm() {
           <h2 style={{ fontSize: "1.75rem", marginBottom: 8, color: "#f8fafc" }}>Select Complaint Category</h2>
           <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>Please select the type of issue you want to report.</p>
           
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
             {ISSUE_CATEGORIES.map((cat) => (
               <div
                 key={cat.id}
@@ -463,21 +474,50 @@ export default function ComplaintForm() {
                 }}
                 className="glass-card"
                 style={{
-                  textAlign: "left", padding: 24, cursor: "pointer",
+                  textAlign: "left", padding: 0, overflow: "hidden", cursor: "pointer",
                   display: "flex", flexDirection: "column", justifyContent: "space-between",
                   border: `1px solid ${cat.border}`,
-                  transition: "all 0.2s ease",
+                  transition: "all 0.25s ease",
                   backgroundColor: "rgba(17, 28, 50, 0.75)"
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = cat.bg}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(17, 28, 50, 0.75)"}
               >
                 <div>
-                  <div style={{ fontSize: 36, marginBottom: 12 }}>{cat.icon}</div>
-                  <h3 style={{ fontSize: "1.05rem", marginBottom: 8, color: "var(--text-main)" }}>{cat.label}</h3>
-                  <p style={{ fontSize: "0.83rem", color: "var(--text-muted)", lineHeight: 1.55 }}>
-                    {cat.description}
-                  </p>
+                  <div style={{ position: "relative", height: 120, overflow: "hidden" }}>
+                    <img
+                      src={cat.image}
+                      alt={cat.label}
+                      className="cat-card-img"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        transition: "transform 0.4s ease"
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        fontSize: 18,
+                        background: "rgba(11, 17, 32, 0.75)",
+                        backdropFilter: "blur(6px)",
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        border: "1px solid rgba(255, 255, 255, 0.15)"
+                      }}
+                    >
+                      {cat.icon}
+                    </div>
+                  </div>
+                  <div style={{ padding: 18 }}>
+                    <h3 style={{ fontSize: "1.02rem", marginBottom: 6, color: "var(--text-main)" }}>{cat.label}</h3>
+                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                      {cat.description}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -516,7 +556,8 @@ export default function ComplaintForm() {
                 >
                   ← Back to All Categories
                 </button>
-                <span className={`category-badge ${currentCategory.badgeClass}`} style={{ margin: 0 }}>
+                <span className={`category-badge ${currentCategory.badgeClass}`} style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <img src={currentCategory.image} alt={currentCategory.label} style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover" }} />
                   <span>{currentCategory.icon}</span> {currentCategory.label}
                 </span>
               </div>
