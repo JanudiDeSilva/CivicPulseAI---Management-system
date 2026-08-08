@@ -8,16 +8,12 @@ from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
- 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
- 
+from ultralytics import YOLO
 
-from fastapi import UploadFile, File
-
- 
 app = FastAPI(title="Flood Risk ML Service")
 
 app.add_middleware(
