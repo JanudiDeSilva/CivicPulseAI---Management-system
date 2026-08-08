@@ -351,6 +351,7 @@ export default function ComplaintForm() {
     // Persist ticket details to localStorage for Admin Dashboard
     const newComplaintRecord = {
       id: trackingId,
+      tracking_id: trackingId,
       name: form.name,
       phone: form.phone,
       email: session?.email || "guest@civicpulse.local",
@@ -391,10 +392,11 @@ export default function ComplaintForm() {
         const storedStr = localStorage.getItem("civic_pulse_user_complaints");
         const storedList = storedStr ? JSON.parse(storedStr) : [];
         const updated = storedList.map((c) =>
-          c.id === trackingId
+          c.id === trackingId || c.tracking_id === trackingId
             ? {
                 ...c,
-                id: serverData.tracking_id || trackingId,
+                id: serverData.id || c.id,
+                tracking_id: serverData.tracking_id || trackingId,
                 severity: serverData.severity || "PENDING",
                 status: serverData.status || "Registered",
               }
