@@ -28,3 +28,56 @@ export async function getFloodRiskFromComplaint({ district, place_name, latitude
     return null; // caller must handle a null result gracefully
   }
 }
+
+export async function predictGarbage(fileBuffer, originalname, mimetype) {
+  try {
+    const formData = new FormData();
+    const blob = new Blob([fileBuffer], { type: mimetype || "image/jpeg" });
+    formData.append("file", blob, originalname || "garbage.jpg");
+
+    const response = await fetch(`${ML_SERVICE_URL}/predict-garbage`, {
+      method: "POST",
+      body: formData,
+    });
+    return await response.json();
+  } catch (err) {
+    console.error("ML garbage service error:", err.message);
+    return { error: "Could not reach AI classification service", detail: err.message };
+  }
+}
+
+export async function predictRoadDamage(fileBuffer, originalname, mimetype, category) {
+  try {
+    const formData = new FormData();
+    const blob = new Blob([fileBuffer], { type: mimetype || "image/jpeg" });
+    formData.append("file", blob, originalname || "roaddamage.jpg");
+    formData.append("category", category || "pothole");
+
+    const response = await fetch(`${ML_SERVICE_URL}/predict-road-damage`, {
+      method: "POST",
+      body: formData,
+    });
+    return await response.json();
+  } catch (err) {
+    console.error("ML road damage service error:", err.message);
+    return { error: "Could not reach AI classification service", detail: err.message };
+  }
+}
+
+export async function getGarbageModelStatus() {
+  try {
+    const { data } = await axios.get(`${ML_SERVICE_URL}/garbage-model-status`, { timeout: 3000 });
+    return data;
+  } catch (err) {
+    return { model_loaded: false, load_error: err.message };
+  }
+}
+
+export async function getRoadDamageModelStatus() {
+  try {
+    const { data } = await axios.get(`${ML_SERVICE_URL}/road-damage-model-status`, { timeout: 3000 });
+    return data;
+  } catch (err) {
+    return { model_loaded: false, load_error: err.message };
+  }
+}

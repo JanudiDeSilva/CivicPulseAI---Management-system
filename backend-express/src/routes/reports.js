@@ -2,7 +2,14 @@ import express from "express";
 import { v4 as uuidv4 } from "uuid";
 import { Report } from "../models/index.js";
 import { triage } from "../services/triage.js";
-import { getFloodRiskFromComplaint } from "../services/floodRiskClient.js";
+import {
+    getFloodRiskFromComplaint,
+    predictGarbage,
+    predictRoadDamage,
+    getGarbageModelStatus,
+    getRoadDamageModelStatus,
+} from "../services/floodRiskClient.js";
+import fs from "fs";
 import { upload } from "../middleware/upload.js";
 import { categoryLabel, categoryIcon, humanizeTime } from "../utils/helpers.js";
 
@@ -182,6 +189,44 @@ router.patch("/reports/:id/reply", async (req, res) => {
     report.admin_reply = reply;
     await report.save();
     res.json({ id: report.id, admin_reply: report.admin_reply, message: "Reply saved" });
+});
+
+// ─── ML SERVICE PROXY ROUTES ────────────────────────────────────────────────
+router.get("/garbage-model-status", async (req, res) => {
+    const status = await getGarbageModelStatus();
+    res.json(status);
+});
+
+router.post("/predict-garbage", upload.single("file"), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No image file uploaded" });
+        }
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const result = await predictGarbage(fileBuffer, req.file.originalname, req.file.mimetype);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to process image", detail: err.message });
+    }
+});
+
+router.get("/road-damage-model-status", async (req, res) => {
+    const status = await getRoadDamageModelStatus();
+    res.json(status);
+});
+
+router.post("/predict-road-damage", upload.single("file"), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No image file uploaded" });
+        }
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const category = req.body.category || "pothole";
+        const result = await predictRoadDamage(fileBuffer, req.file.originalname, req.file.mimetype, category);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to process image", detail: err.message });
+    }
 });
 
 export default router;
