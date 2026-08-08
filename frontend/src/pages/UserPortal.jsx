@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
+import { syncReports } from "../services/api";
 
 const CATEGORY_META = {
   flood:         { title: "Flood & Drainage",  icon: "🌊" },
@@ -10,18 +10,42 @@ const CATEGORY_META = {
   street_light:  { title: "Street Lights",     icon: "💡" },
 };
 
+const STORAGE_KEY = "civic_pulse_user_complaints";
+const POLL_INTERVAL_MS = 10000;
+
 const loadComplaints = () => {
   try {
-    return JSON.parse(localStorage.getItem("civic_pulse_user_complaints") || "[]");
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
   } catch {
     return [];
   }
 };
 
+function mergeServerReport(local, remote) {
+  return {
+    ...local,
+    id: remote.id,
+    tracking_id: remote.tracking_id || local.tracking_id,
+    status: remote.status || local.status,
+    admin_reply: remote.admin_reply ?? null,
+    severity: remote.severity || local.severity,
+  };
+}
+
+function matchesReport(local, remote) {
+  return (
+    local.id === remote.id ||
+    local.tracking_id === remote.tracking_id ||
+    local.id === remote.tracking_id ||
+    local.tracking_id === remote.id
+  );
+}
+
 export default function UserPortal() {
   const { session } = useAuth();
   const [complaints, setComplaints] = useState(loadComplaints);
   const [editingId, setEditingId] = useState(null);
+  const [lastSynced, setLastSynced] = useState(null);
   const [draft, setDraft] = useState({
     district: "",
     city: "",
@@ -30,22 +54,39 @@ export default function UserPortal() {
     phone: "",
   });
 
-  // Pull fresh data from backend to get admin_reply from DB
-  useEffect(() => {
+  const refreshFromServer = useCallback(async () => {
     const stored = loadComplaints();
     if (stored.length === 0) return;
-    const ids = stored.map((c) => c.id).filter(Boolean);
-    Promise.allSettled(ids.map((id) => api.get(`/reports/${id}`)))
-      .then((results) => {
-        const updated = stored.map((c) => {
-          const match = results.find((r) => r.status === "fulfilled" && r.value.data.id === c.id);
-          if (match) return { ...c, admin_reply: match.value.data.admin_reply || null, status: match.value.data.status || c.status };
-          return c;
-        });
-        setComplaints(updated);
-        localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
+
+    const identifiers = stored
+      .flatMap((c) => [c.id, c.tracking_id])
+      .filter(Boolean);
+
+    if (identifiers.length === 0) return;
+
+    try {
+      const { data } = await syncReports([...new Set(identifiers)]);
+      const remoteReports = data.reports || [];
+      if (remoteReports.length === 0) return;
+
+      const updated = stored.map((local) => {
+        const remote = remoteReports.find((r) => matchesReport(local, r));
+        return remote ? mergeServerReport(local, remote) : local;
       });
+
+      setComplaints(updated);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      setLastSynced(new Date());
+    } catch (err) {
+      console.error("Failed to sync complaints:", err);
+    }
   }, []);
+
+  useEffect(() => {
+    refreshFromServer();
+    const interval = setInterval(refreshFromServer, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [refreshFromServer]);
 
   const mine = useMemo(
     () => complaints.filter((item) => item.email === session?.email || item.created_by_email === session?.email),
@@ -76,7 +117,7 @@ export default function UserPortal() {
       };
     });
 
-    localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     setComplaints(updated);
     setEditingId(null);
   };
@@ -85,7 +126,14 @@ export default function UserPortal() {
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div className="glass-card" style={{ padding: 24, marginBottom: 20 }}>
         <h1 style={{ marginBottom: 6 }}>My Complaint Portal</h1>
-        <p style={{ margin: 0 }}>Signed in as <strong>{session?.name}</strong> · {session?.email}</p>
+        <p style={{ margin: 0 }}>
+          Signed in as <strong>{session?.name}</strong> · {session?.email}
+          {lastSynced && (
+            <span style={{ marginLeft: 10, fontSize: "0.82rem", color: "#64748b" }}>
+              · Live sync: {lastSynced.toLocaleTimeString()}
+            </span>
+          )}
+        </p>
       </div>
 
       <div className="grid-2">
@@ -115,12 +163,31 @@ export default function UserPortal() {
 
                 <div className="ticket-desc">{item.description || "No complaint details saved."}</div>
 
-                {item.admin_reply && (
-                  <div className="reply-box" style={{ marginTop: 10, padding: "10px 14px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 8 }}>
-                    <div style={{ fontSize: "0.75rem", color: "#93c5fd", fontWeight: 700, marginBottom: 4 }}>📨 Official Admin Reply:</div>
-                    <div style={{ fontSize: "0.88rem", color: "#e2e8f0" }}>{item.admin_reply}</div>
+                <div
+                  className="reply-box"
+                  style={{
+                    marginTop: 10,
+                    padding: "10px 14px",
+                    background: item.admin_reply ? "rgba(59,130,246,0.1)" : "rgba(100,116,139,0.08)",
+                    border: item.admin_reply ? "1px solid rgba(59,130,246,0.3)" : "1px solid rgba(100,116,139,0.25)",
+                    borderRadius: 8,
+                  }}
+                >
+                  <div style={{ fontSize: "0.75rem", color: item.admin_reply ? "#93c5fd" : "#94a3b8", fontWeight: 700, marginBottom: 4 }}>
+                    📨 Official Admin Reply {item.admin_reply ? "" : "(pending)"}
                   </div>
-                )}
+                  <div
+                    style={{
+                      fontSize: "0.88rem",
+                      color: item.admin_reply ? "#e2e8f0" : "#64748b",
+                      fontStyle: item.admin_reply ? "normal" : "italic",
+                      whiteSpace: "pre-wrap",
+                    }}
+                    aria-readonly="true"
+                  >
+                    {item.admin_reply || "No reply from the municipal office yet. Status updates appear here automatically."}
+                  </div>
+                </div>
 
                 <button className="btn btn-secondary" type="button" onClick={() => startEdit(item)}>
                   Edit Complaint

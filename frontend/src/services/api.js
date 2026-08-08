@@ -29,8 +29,12 @@ export const updateReportStatus = (reportId, status) =>
 export const updateReportReply = (reportId, reply) =>
   api.patch(`/reports/${reportId}/reply`, { reply });
 
-// Fetch a single report by id
+// Fetch a single report by id or tracking id
 export const fetchReport = (reportId) =>
   api.get(`/reports/${reportId}`);
+
+// Batch sync status + admin replies for user portal polling
+export const syncReports = (identifiers) =>
+  api.post("/reports/sync", { identifiers });
 
 export default api;

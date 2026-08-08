@@ -15,6 +15,43 @@ import { categoryLabel, categoryIcon, humanizeTime } from "../utils/helpers.js";
 
 const router = express.Router();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function findReportByIdOrTracking(param) {
+    if (UUID_RE.test(param)) {
+        return Report.findByPk(param);
+    }
+    return Report.findOne({ where: { tracking_id: param } });
+}
+
+function formatReportResponse(report) {
+    return {
+        id: report.id,
+        tracking_id: report.tracking_id,
+        name: report.name,
+        phone: report.phone,
+        category: report.category,
+        category_label: categoryLabel(report.category),
+        icon: categoryIcon(report.category),
+        district: report.district,
+        city: report.city,
+        area: report.area,
+        description: report.raw_text,
+        specific_details: report.specific_details,
+        severity: report.severity,
+        priority_score: report.priority_score,
+        status: report.status,
+        admin_reply: report.admin_reply || null,
+        predicted_escalation: report.predicted_escalation,
+        escalation_confidence: report.escalation_confidence,
+        source: report.source,
+        latitude: report.latitude,
+        longitude: report.longitude,
+        submitted_at: humanizeTime(report.created_at),
+        created_at: report.created_at,
+    };
+}
+
 // ─── POST /predict ──────────────────────────────────────────────────────────
 router.post("/predict", upload.single("photo"), async (req, res) => {
     try {
@@ -77,6 +114,7 @@ router.post("/predict", upload.single("photo"), async (req, res) => {
         });
 
         res.json({
+            id: report.id,
             tracking_id: report.tracking_id,
             severity,
             priority_score: priorityScore,
@@ -106,58 +144,33 @@ router.get("/reports", async (req, res) => {
         offset: parseInt(offset),
     });
 
-    const result = rows.map((r) => ({
-        id: r.id,
-        tracking_id: r.tracking_id,
-        name: r.name,
-        phone: r.phone,
-        category: r.category,
-        category_label: categoryLabel(r.category),
-        icon: categoryIcon(r.category),
-        district: r.district,
-        city: r.city,
-        area: r.area,
-        specific_details: r.specific_details,
-        description: r.raw_text,
-        severity: r.severity,
-        priority_score: r.priority_score,
-        status: r.status,
-        admin_reply: r.admin_reply || null,
-        predicted_escalation: r.predicted_escalation,
-        escalation_confidence: r.escalation_confidence,
-        source: r.source,
-        latitude: r.latitude,
-        longitude: r.longitude,
-        submitted_at: humanizeTime(r.created_at),
-        created_at: r.created_at,
-    }));
+    const result = rows.map((r) => formatReportResponse(r));
 
     res.json({ reports: result, total: count });
 });
 
+// ─── POST /reports/sync ─────────────────────────────────────────────────────
+router.post("/reports/sync", async (req, res) => {
+    const { identifiers = [] } = req.body;
+    if (!Array.isArray(identifiers) || identifiers.length === 0) {
+        return res.status(400).json({ detail: "identifiers array is required" });
+    }
+
+    const reports = [];
+    for (const identifier of identifiers) {
+        const report = await findReportByIdOrTracking(String(identifier));
+        if (report) reports.push(formatReportResponse(report));
+    }
+
+    res.json({ reports });
+});
+
 // ─── GET /reports/:id ───────────────────────────────────────────────────────
 router.get("/reports/:id", async (req, res) => {
-    const report = await Report.findByPk(req.params.id);
+    const report = await findReportByIdOrTracking(req.params.id);
     if (!report) return res.status(404).json({ detail: "Report not found" });
 
-    res.json({
-        id: report.id,
-        tracking_id: report.tracking_id,
-        name: report.name,
-        phone: report.phone,
-        category: report.category,
-        district: report.district,
-        city: report.city,
-        area: report.area,
-        description: report.raw_text,
-        specific_details: report.specific_details,
-        severity: report.severity,
-        priority_score: report.priority_score,
-        status: report.status,
-        predicted_escalation: report.predicted_escalation,
-        escalation_confidence: report.escalation_confidence,
-        created_at: report.created_at,
-    });
+    res.json(formatReportResponse(report));
 });
 
 // ─── PATCH /reports/:id/status ──────────────────────────────────────────────
@@ -168,12 +181,17 @@ router.patch("/reports/:id/status", async (req, res) => {
         return res.status(400).json({ detail: `Status must be one of: ${validStatuses}` });
     }
 
-    const report = await Report.findByPk(req.params.id);
+    const report = await findReportByIdOrTracking(req.params.id);
     if (!report) return res.status(404).json({ detail: "Report not found" });
 
     report.status = status;
     await report.save();
-    res.json({ id: report.id, status: report.status, message: "Status updated" });
+    res.json({
+        id: report.id,
+        tracking_id: report.tracking_id,
+        status: report.status,
+        message: "Status updated",
+    });
 });
 
 // ─── PATCH /reports/:id/reply ───────────────────────────────────────────────
@@ -183,12 +201,17 @@ router.patch("/reports/:id/reply", async (req, res) => {
         return res.status(400).json({ detail: "reply field is required" });
     }
 
-    const report = await Report.findByPk(req.params.id);
+    const report = await findReportByIdOrTracking(req.params.id);
     if (!report) return res.status(404).json({ detail: "Report not found" });
 
     report.admin_reply = reply;
     await report.save();
-    res.json({ id: report.id, admin_reply: report.admin_reply, message: "Reply saved" });
+    res.json({
+        id: report.id,
+        tracking_id: report.tracking_id,
+        admin_reply: report.admin_reply,
+        message: "Reply saved",
+    });
 });
 
 // ─── ML SERVICE PROXY ROUTES ────────────────────────────────────────────────
