@@ -336,6 +336,21 @@ export default function ComplaintForm() {
       // --- END ADDED ---
     }
   };
+
+  const handleDetachPhoto = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setPhoto(null);
+    setPhotoPreview(null);
+    setGarbageResult(null);
+    setGarbageError(null);
+    const fileInput = document.getElementById("photo-upload-input");
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  };
  
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1206,18 +1221,45 @@ export default function ComplaintForm() {
               />
               <label htmlFor="photo-upload-input" style={{ cursor: "pointer", display: "block" }}>
                 {photoPreview ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
-                    <img
-                      src={photoPreview}
-                      alt="Preview"
-                      style={{ width: 50, height: 50, borderRadius: 8, objectFit: "cover", border: "1px solid #475569" }}
-                    />
-                    <div style={{ textAlign: "left" }}>
-                      <p style={{ fontWeight: 600, color: "#f8fafc", margin: 0 }}>{photo.name}</p>
-                      <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: 0 }}>
-                        {(photo.size / 1024).toFixed(1)} KB • Click to change photo
-                      </p>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, width: "100%", maxWidth: 450, margin: "0 auto" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <img
+                        src={photoPreview}
+                        alt="Preview"
+                        style={{ width: 50, height: 50, borderRadius: 8, objectFit: "cover", border: "1px solid #475569" }}
+                      />
+                      <div style={{ textAlign: "left" }}>
+                        <p style={{ fontWeight: 600, color: "#f8fafc", margin: 0, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{photo?.name || "Image file"}</p>
+                        <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: 0 }}>
+                          {photo ? `${(photo.size / 1024).toFixed(1)} KB • ` : ""}Click to change photo
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleDetachPhoto}
+                      style={{
+                        background: "rgba(239, 68, 68, 0.2)",
+                        color: "#f87171",
+                        border: "1px solid rgba(239, 68, 68, 0.4)",
+                        borderRadius: 8,
+                        padding: "6px 12px",
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = "rgba(239, 68, 68, 0.35)";
+                        e.target.style.color = "#fca5a5";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = "rgba(239, 68, 68, 0.2)";
+                        e.target.style.color = "#f87171";
+                      }}
+                    >
+                      ✕ Detach
+                    </button>
                   </div>
                 ) : (
                   <div>

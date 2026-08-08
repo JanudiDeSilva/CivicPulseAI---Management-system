@@ -163,31 +163,76 @@ export default function UserPortal() {
 
                 <div className="ticket-desc">{item.description || "No complaint details saved."}</div>
 
-                <div
-                  className="reply-box"
-                  style={{
-                    marginTop: 10,
-                    padding: "10px 14px",
-                    background: item.admin_reply ? "rgba(59,130,246,0.1)" : "rgba(100,116,139,0.08)",
-                    border: item.admin_reply ? "1px solid rgba(59,130,246,0.3)" : "1px solid rgba(100,116,139,0.25)",
-                    borderRadius: 8,
-                  }}
-                >
-                  <div style={{ fontSize: "0.75rem", color: item.admin_reply ? "#93c5fd" : "#94a3b8", fontWeight: 700, marginBottom: 4 }}>
-                    📨 Official Admin Reply {item.admin_reply ? "" : "(pending)"}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "0.88rem",
-                      color: item.admin_reply ? "#e2e8f0" : "#64748b",
-                      fontStyle: item.admin_reply ? "normal" : "italic",
+                {/* ── Official Admin Reply ── */}
+                {item.admin_reply ? (
+                  <div style={{
+                    marginTop: 14,
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    border: "1px solid rgba(56, 189, 248, 0.35)",
+                    boxShadow: "0 0 18px rgba(56,189,248,0.08)",
+                  }}>
+                    {/* Header bar */}
+                    <div style={{
+                      background: "linear-gradient(90deg, rgba(26,86,219,0.55) 0%, rgba(56,189,248,0.25) 100%)",
+                      padding: "8px 14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}>
+                      <span style={{ fontSize: "1rem" }}>🏛️</span>
+                      <span style={{
+                        fontSize: "0.78rem",
+                        fontWeight: 700,
+                        color: "#bae6fd",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                      }}>
+                        Official Municipal Response
+                      </span>
+                      <span style={{
+                        marginLeft: "auto",
+                        fontSize: "0.7rem",
+                        background: "rgba(56,189,248,0.25)",
+                        color: "#7dd3fc",
+                        border: "1px solid rgba(56,189,248,0.3)",
+                        borderRadius: 999,
+                        padding: "2px 10px",
+                        fontWeight: 600,
+                      }}>
+                        ✓ Replied
+                      </span>
+                    </div>
+                    {/* Reply body */}
+                    <div style={{
+                      background: "rgba(15, 30, 60, 0.7)",
+                      padding: "12px 16px",
+                      fontSize: "0.9rem",
+                      color: "#e0f2fe",
+                      lineHeight: 1.65,
                       whiteSpace: "pre-wrap",
-                    }}
-                    aria-readonly="true"
-                  >
-                    {item.admin_reply || "No reply from the municipal office yet. Status updates appear here automatically."}
+                      wordBreak: "break-word",
+                    }}>
+                      {item.admin_reply}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div style={{
+                    marginTop: 12,
+                    padding: "10px 14px",
+                    background: "rgba(100,116,139,0.06)",
+                    border: "1px dashed rgba(100,116,139,0.25)",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}>
+                    <span style={{ fontSize: "1rem", opacity: 0.6 }}>📨</span>
+                    <span style={{ fontSize: "0.82rem", color: "#64748b", fontStyle: "italic" }}>
+                      Awaiting official reply from the municipal office…
+                    </span>
+                  </div>
+                )}
 
                 <button className="btn btn-secondary" type="button" onClick={() => startEdit(item)}>
                   Edit Complaint

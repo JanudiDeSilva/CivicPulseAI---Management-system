@@ -47,6 +47,19 @@ function formatReportResponse(report) {
         source: report.source,
         latitude: report.latitude,
         longitude: report.longitude,
+        elevation_m: report.elevation_m,
+        distance_to_river_m: report.distance_to_river_m,
+        population_density_per_km2: report.population_density_per_km2,
+        built_up_percent: report.built_up_percent,
+        rainfall_7d_mm: report.rainfall_7d_mm,
+        monthly_rainfall_mm: report.monthly_rainfall_mm,
+        ndvi: report.ndvi,
+        ndwi: report.ndwi,
+        water_presence_flag: report.water_presence_flag,
+        historical_flood_count: report.historical_flood_count,
+        infrastructure_score: report.infrastructure_score,
+        nearest_hospital_km: report.nearest_hospital_km,
+        nearest_evac_km: report.nearest_evac_km,
         submitted_at: humanizeTime(report.created_at),
         created_at: report.created_at,
     };
@@ -203,6 +216,10 @@ router.patch("/reports/:id/reply", async (req, res) => {
 
     const report = await findReportByIdOrTracking(req.params.id);
     if (!report) return res.status(404).json({ detail: "Report not found" });
+
+    if (report.admin_reply) {
+        return res.status(400).json({ detail: "Reply has already been sent and cannot be modified" });
+    }
 
     report.admin_reply = reply;
     await report.save();

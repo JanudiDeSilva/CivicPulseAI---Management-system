@@ -152,8 +152,11 @@ body, button, input, select, textarea {
 body {
   background-color: var(--bg-primary);
   background-image:
+    linear-gradient(rgba(56, 189, 248, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.015) 1px, transparent 1px),
     radial-gradient(at 0% 0%, var(--bg-gradient-1) 0px, transparent 50%),
     radial-gradient(at 100% 100%, var(--bg-gradient-2) 0px, transparent 50%);
+  background-size: 50px 50px, 50px 50px, 100% 100%, 100% 100%;
   background-attachment: fixed;
   color: var(--text-main);
   line-height: 1.6;

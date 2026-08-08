@@ -3,21 +3,21 @@ import { fetchReports, fetchStats, updateReportStatus, updateReportReply } from 
 import MapView from "../components/MapView";
 
 const CATEGORY_META = {
-  flood:         { title: "Flood & Drainage",  icon: "🌊", color: "#3b82f6", badge: "badge-flood" },
-  road_damage:   { title: "Road Damages",      icon: "🚗", color: "#f59e0b", badge: "badge-road_damage" },
-  garbage:       { title: "Garbage & Waste",   icon: "🗑️", color: "#10b981", badge: "badge-garbage" },
-  power_failure: { title: "Power Outages",     icon: "⚡", color: "#8b5cf6", badge: "badge-power_failure" },
-  street_light:  { title: "Street Lights",     icon: "💡", color: "#eab308", badge: "badge-street_light" },
+  flood: { title: "Flood & Drainage", icon: "🌊", color: "#3b82f6", badge: "badge-flood" },
+  road_damage: { title: "Road Damages", icon: "🚗", color: "#f59e0b", badge: "badge-road_damage" },
+  garbage: { title: "Garbage & Waste", icon: "🗑️", color: "#10b981", badge: "badge-garbage" },
+  power_failure: { title: "Power Outages", icon: "⚡", color: "#8b5cf6", badge: "badge-power_failure" },
+  street_light: { title: "Street Lights", icon: "💡", color: "#eab308", badge: "badge-street_light" },
 };
 
 const STATUS_OPTIONS = ["All", "Registered", "Under Review", "Dispatched", "Resolved"];
 
 const SEVERITY_COLORS = {
   CRITICAL: { bg: "rgba(239, 68, 68, 0.18)", border: "rgba(239, 68, 68, 0.5)", text: "#ef4444" },
-  HIGH:     { bg: "rgba(249, 115, 22, 0.18)", border: "rgba(249, 115, 22, 0.5)", text: "#f97316" },
-  MEDIUM:   { bg: "rgba(234, 179, 8, 0.18)",  border: "rgba(234, 179, 8, 0.5)",  text: "#eab308" },
-  LOW:      { bg: "rgba(34, 197, 94, 0.18)",  border: "rgba(34, 197, 94, 0.5)",  text: "#22c55e" },
-  PENDING:  { bg: "rgba(100, 116, 139, 0.18)", border: "rgba(100, 116, 139, 0.4)", text: "#94a3b8" },
+  HIGH: { bg: "rgba(249, 115, 22, 0.18)", border: "rgba(249, 115, 22, 0.5)", text: "#f97316" },
+  MEDIUM: { bg: "rgba(234, 179, 8, 0.18)", border: "rgba(234, 179, 8, 0.5)", text: "#eab308" },
+  LOW: { bg: "rgba(34, 197, 94, 0.18)", border: "rgba(34, 197, 94, 0.5)", text: "#22c55e" },
+  PENDING: { bg: "rgba(100, 116, 139, 0.18)", border: "rgba(100, 116, 139, 0.4)", text: "#94a3b8" },
 };
 
 function SeverityPill({ severity }) {
@@ -28,18 +28,18 @@ function SeverityPill({ severity }) {
       textTransform: "uppercase", letterSpacing: "0.06em",
       background: c.bg, color: c.text, border: `1px solid ${c.border}`
     }}>
-      {severity === "PENDING" ? "⏳ Triaging…" : severity}
+      {severity === "PENDING" ? "Triaging…" : severity}
     </span>
   );
 }
 
 function StatusBadge({ status }) {
   const colorMap = {
-    "Dispatched":    "#34d399",
-    "Resolved":      "#10b981",
-    "Under Review":  "#fbbf24",
-    "Registered":    "#94a3b8",
-    "Closed":        "#64748b",
+    "Dispatched": "#34d399",
+    "Resolved": "#10b981",
+    "Under Review": "#fbbf24",
+    "Registered": "#94a3b8",
+    "Closed": "#64748b",
   };
   return (
     <span style={{ fontWeight: 600, fontSize: "0.85rem", color: colorMap[status] || "#94a3b8" }}>
@@ -65,18 +65,18 @@ function SkeletonRow() {
 
 export default function Dashboard() {
   const [activeCategory, setActiveCategory] = useState("all");
-  const [activeStatus, setActiveStatus]   = useState("All");
-  const [complaints, setComplaints]        = useState([]);
-  const [stats, setStats]                  = useState(null);
-  const [loading, setLoading]              = useState(true);
-  const [lastRefresh, setLastRefresh]      = useState(null);
-  const [showMap, setShowMap]              = useState(false);
+  const [activeStatus, setActiveStatus] = useState("All");
+  const [complaints, setComplaints] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [showMap, setShowMap] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(null);
-  const [error, setError]                  = useState(null);
-  const [replyDrafts, setReplyDrafts]      = useState({});
-  const [replySaving, setReplySaving]      = useState(null);
-  const [replySuccess, setReplySuccess]    = useState(null);
-  const [expandedFlood, setExpandedFlood]  = useState(null);
+  const [error, setError] = useState(null);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replySaving, setReplySaving] = useState(null);
+  const [replySuccess, setReplySuccess] = useState(null);
+  const [expandedFlood, setExpandedFlood] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -92,7 +92,7 @@ export default function Dashboard() {
       try {
         const stored = JSON.parse(localStorage.getItem("civic_pulse_user_complaints") || "[]");
         if (stored.length > 0) setComplaints(stored);
-      } catch (_) {}
+      } catch (_) { }
     } finally {
       setLoading(false);
     }
@@ -361,7 +361,7 @@ export default function Dashboard() {
                         <SeverityPill severity={item.severity} />
                         {item.priority_score > 0 && (
                           <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>
-                            Risk Score: <strong style={{color:"#cbd5e1"}}>{(item.priority_score * 100).toFixed(0)}%</strong>
+                            Risk Score: <strong style={{ color: "#cbd5e1" }}>{(item.priority_score * 100).toFixed(0)}%</strong>
                           </div>
                         )}
                         {item.category === "flood" && (
@@ -394,8 +394,21 @@ export default function Dashboard() {
                                   </div>
                                 </div>
                                 <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(59,130,246,0.2)", color: "#64748b", fontSize: "0.72rem" }}>
-                                  📡 Model inputs: district geo-features, live 7-day rainfall from Open-Meteo, elevation, distance to river, soil type, NDVI/NDWI indices & population density.
-                                </div>
+  {/* Model Inputs */}
+  { (item.elevation_m != null || item.distance_to_river_m != null || item.rainfall_7d_mm != null || item.monthly_rainfall_mm != null || item.population_density_per_km2 != null || item.ndvi != null || item.ndwi != null) ? (
+    <div style={{ display: "grid", gap: "4px", marginTop: 4 }}>
+      {item.elevation_m != null && <div><strong>Elevation:</strong> {item.elevation_m} m</div>}
+      {item.distance_to_river_m != null && <div><strong>Dist. to River:</strong> {item.distance_to_river_m} m</div>}
+      {item.rainfall_7d_mm != null && <div><strong>Rainfall (7d):</strong> {item.rainfall_7d_mm} mm</div>}
+      {item.monthly_rainfall_mm != null && <div><strong>Monthly Rainfall:</strong> {item.monthly_rainfall_mm} mm</div>}
+      {item.population_density_per_km2 != null && <div><strong>Population Density:</strong> {item.population_density_per_km2} /km²</div>}
+      {item.ndvi != null && <div><strong>NDVI:</strong> {item.ndvi}</div>}
+      {item.ndwi != null && <div><strong>NDWI:</strong> {item.ndwi}</div>}
+    </div>
+  ) : (
+    <div>📡 Model inputs: district geo-features, live 7‑day rainfall from Open‑Meteo, elevation, distance to river, soil type, NDVI/NDWI indices & population density.</div>
+  )}
+</div>
                               </div>
                             )}
                           </div>
@@ -424,48 +437,69 @@ export default function Dashboard() {
                         </select>
                       </td>
                       <td style={{ padding: "14px", minWidth: 200 }}>
-                        {item.admin_reply && replySaving !== item.id && (
-                          <div style={{ fontSize: "0.72rem", color: "#4ade80", marginBottom: 4 }}>✓ Reply sent to user</div>
+                        {item.admin_reply ? (
+                          <>
+                            <div style={{ fontSize: "0.72rem", color: "#4ade80", marginBottom: 6, display: "flex", alignItems: "center", gap: "4px" }}>
+                              <span>✓ Reply sent to user</span>
+                            </div>
+                            <div style={{
+                              width: "100%",
+                              minWidth: 180,
+                              background: "rgba(16, 185, 129, 0.05)",
+                              color: "#a7f3d0",
+                              border: "1px solid rgba(16, 185, 129, 0.2)",
+                              borderRadius: 8,
+                              padding: "8px 10px",
+                              fontSize: "0.78rem",
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word"
+                            }}>
+                              {item.admin_reply}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <textarea
+                              rows={2}
+                              value={replyDrafts[item.id] !== undefined ? replyDrafts[item.id] : ""}
+                              onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                              placeholder="Type a reply to the citizen…"
+                              style={{
+                                width: "100%",
+                                minWidth: 180,
+                                background: "rgba(15,23,42,0.7)",
+                                color: "#e2e8f0",
+                                border: "1px solid #334155",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontSize: "0.78rem",
+                                resize: "vertical",
+                                display: "block"
+                              }}
+                            />
+                            <button
+                              onClick={() => handleReplySubmit(item.id)}
+                              disabled={replySaving === item.id || !replyDrafts[item.id]?.trim()}
+                              style={{
+                                marginTop: 6,
+                                width: "100%",
+                                padding: "6px 10px",
+                                fontSize: "0.75rem",
+                                fontWeight: 700,
+                                borderRadius: 7,
+                                border: "none",
+                                cursor: (replySaving === item.id || !replyDrafts[item.id]?.trim()) ? "not-allowed" : "pointer",
+                                background: replySuccess === item.id
+                                  ? "rgba(34,197,94,0.25)"
+                                  : (!replyDrafts[item.id]?.trim() ? "rgba(59,130,246,0.05)" : "rgba(59,130,246,0.2)"),
+                                color: replySuccess === item.id ? "#4ade80" : (!replyDrafts[item.id]?.trim() ? "#64748b" : "#93c5fd"),
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              {replySaving === item.id ? "Sending…" : replySuccess === item.id ? "✓ Sent!" : "📨 Send Reply"}
+                            </button>
+                          </>
                         )}
-                        <textarea
-                          rows={2}
-                          value={replyDrafts[item.id] !== undefined ? replyDrafts[item.id] : (item.admin_reply || "")}
-                          onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                          placeholder="Type a reply to the citizen…"
-                          style={{
-                            width: "100%",
-                            minWidth: 180,
-                            background: "rgba(15,23,42,0.7)",
-                            color: "#e2e8f0",
-                            border: "1px solid #334155",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            fontSize: "0.78rem",
-                            resize: "vertical",
-                            display: "block"
-                          }}
-                        />
-                        <button
-                          onClick={() => handleReplySubmit(item.id)}
-                          disabled={replySaving === item.id}
-                          style={{
-                            marginTop: 6,
-                            width: "100%",
-                            padding: "6px 10px",
-                            fontSize: "0.75rem",
-                            fontWeight: 700,
-                            borderRadius: 7,
-                            border: "none",
-                            cursor: replySaving === item.id ? "not-allowed" : "pointer",
-                            background: replySuccess === item.id
-                              ? "rgba(34,197,94,0.25)"
-                              : "rgba(59,130,246,0.2)",
-                            color: replySuccess === item.id ? "#4ade80" : "#93c5fd",
-                            transition: "all 0.2s"
-                          }}
-                        >
-                          {replySaving === item.id ? "Sending…" : replySuccess === item.id ? "✓ Sent!" : "📨 Send Reply"}
-                        </button>
                       </td>
                       <td style={{ padding: "14px", fontSize: "0.78rem", color: "#94a3b8", whiteSpace: "nowrap" }}>
                         {item.submitted_at || "—"}
