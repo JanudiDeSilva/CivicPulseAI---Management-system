@@ -166,7 +166,7 @@ export default function Dashboard() {
       {/* ─── Header ────────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 16 }}>
         <div>
-          <h1 style={{ fontSize: "2.1rem", margin: 0 }}>Municipal Admin Dashboard</h1>
+          <h1 style={{ fontSize: "2.1rem", margin: 0 }}> Admin Dashboard</h1>
           <p style={{ marginTop: 4, color: "var(--text-muted)", fontSize: "0.9rem" }}>
             Real-time triage and field dispatch overview.
             {lastRefresh && (
