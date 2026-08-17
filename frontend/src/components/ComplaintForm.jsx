@@ -131,7 +131,7 @@ export default function ComplaintForm() {
   const [garbageResult, setGarbageResult] = useState(null);
   const [garbageLoading, setGarbageLoading] = useState(false);
   const [garbageError, setGarbageError] = useState(null);
-  const GARBAGE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const GARBAGE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:8001";
   // --- END ADDED ---
  
   const currentCategory = ISSUE_CATEGORIES.find((c) => c.id === form.category);
