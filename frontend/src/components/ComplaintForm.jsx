@@ -425,6 +425,8 @@ export default function ComplaintForm() {
                 tracking_id: serverData.tracking_id || trackingId,
                 severity: serverData.severity || "PENDING",
                 status: serverData.status || "Registered",
+                image_url: serverData.image_url || photoPreview || c.image_url,
+                ml_analysis: serverData.ml_analysis || garbageResult || c.ml_analysis,
               }
             : c
         );
@@ -470,15 +472,40 @@ export default function ComplaintForm() {
         forced_min_priority: "High",
       } : null;
 
+      const demoSeverity = form.category === "road_damage" ? "CRITICAL" : "MEDIUM";
+      const demoPriorityScore = form.category === "road_damage" ? 0.6278 : 0.5;
+      const demoStatus = form.category === "road_damage" ? "Dispatched" : "Registered";
+      const demoPredictedEscalation = form.category === "road_damage" ? "MATCH" : "NO";
+
+      // Update localStorage for fallback
+      try {
+        const storedStr = localStorage.getItem("civic_pulse_user_complaints");
+        const storedList = storedStr ? JSON.parse(storedStr) : [];
+        const updated = storedList.map((c) =>
+          c.id === trackingId || c.tracking_id === trackingId
+            ? {
+                ...c,
+                severity: demoSeverity,
+                status: demoStatus,
+                image_url: photoPreview || null,
+                ml_analysis: demoMlAnalysis || garbageResult || null,
+                priority_score: demoPriorityScore,
+                predicted_escalation: demoPredictedEscalation
+              }
+            : c
+        );
+        localStorage.setItem("civic_pulse_user_complaints", JSON.stringify(updated));
+      } catch (_) {}
+
       setSubmissionSuccess({
         trackingId,
         category: form.category,
-        severity: form.category === "road_damage" ? "CRITICAL" : "MEDIUM",
-        priorityScore: form.category === "road_damage" ? 0.6278 : 0.5,
-        predictedEscalation: form.category === "road_damage" ? "MATCH" : "NO",
+        severity: demoSeverity,
+        priorityScore: demoPriorityScore,
+        predictedEscalation: demoPredictedEscalation,
         isActualDamage: form.category === "road_damage" ? true : null,
         mlAnalysis: demoMlAnalysis,
-        status: form.category === "road_damage" ? "Dispatched" : "Registered",
+        status: demoStatus,
         categoryLabel: currentCategory.label,
         categoryIcon: currentCategory.icon,
         name: form.name,

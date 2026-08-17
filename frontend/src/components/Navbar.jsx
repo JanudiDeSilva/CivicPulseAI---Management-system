@@ -73,7 +73,7 @@ export default function Navbar() {
                   isActive("/about") ? " active" : ""
                 }`}
               >
-                About Us
+                {t("nav_about")}
               </Link>
 
               {/* Complaint */}

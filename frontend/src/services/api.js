@@ -37,4 +37,8 @@ export const fetchReport = (reportId) =>
 export const syncReports = (identifiers) =>
   api.post("/reports/sync", { identifiers });
 
+// Delete a report
+export const deleteComplaint = (reportId) =>
+  api.delete(`/reports/${reportId}`);
+
 export default api;

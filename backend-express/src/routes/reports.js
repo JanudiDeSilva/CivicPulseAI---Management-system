@@ -25,6 +25,45 @@ async function findReportByIdOrTracking(param) {
 }
 
 function formatReportResponse(report) {
+    const normalizeImageUrl = (value) => {
+        if (!value) return null;
+        if (value.startsWith("http://") || value.startsWith("https://")) return value;
+        return `http://127.0.0.1:8000${value.startsWith("/") ? value : `/${value}`}`;
+    };
+
+    const reportImageUrl = normalizeImageUrl(report.image_url);
+    const ml = report.ml_analysis || {};
+    const risk = report.risk_signals || {};
+    const severityFromModel = (() => {
+        const direct = ml?.risk_level || ml?.severity || risk?.floodRisk?.risk_level;
+        if (direct) return String(direct).toUpperCase();
+        if (ml?.confidence != null) {
+            const value = Number(ml.confidence);
+            if (value >= 0.8) return "HIGH";
+            if (value >= 0.5) return "MEDIUM";
+            return "LOW";
+        }
+        if (ml?.image_damage_score != null) {
+            const value = Number(ml.image_damage_score);
+            if (value >= 3) return "HIGH";
+            if (value >= 1.5) return "MEDIUM";
+            return "LOW";
+        }
+        return null;
+    })();
+
+    const priorityFromModel = (() => {
+        const direct = ml?.flood_probability ?? ml?.confidence ?? risk?.floodRisk?.flood_probability ?? risk?.floodRisk?.confidence;
+        if (typeof direct === "number") return Math.min(Math.max(Number(direct), 0), 1);
+        if (ml?.image_damage_score != null) {
+            return Math.min(Math.max(Number(ml.image_damage_score) / 10, 0.15), 0.95);
+        }
+        return null;
+    })();
+
+    const displaySeverity = report.severity || severityFromModel || "PENDING";
+    const displayPriority = report.priority_score ?? priorityFromModel ?? 0;
+
     return {
         id: report.id,
         tracking_id: report.tracking_id,
@@ -38,8 +77,13 @@ function formatReportResponse(report) {
         area: report.area,
         description: report.raw_text,
         specific_details: report.specific_details,
-        severity: report.severity,
-        priority_score: report.priority_score,
+        image_url: reportImageUrl,
+        photo_url: reportImageUrl,
+        ml_analysis: report.ml_analysis || null,
+        risk_signals: report.risk_signals || null,
+        severity: displaySeverity,
+        priority_score: displayPriority,
+        severity_score: report.severity_score || displayPriority,
         status: report.status,
         admin_reply: report.admin_reply || null,
         predicted_escalation: report.predicted_escalation,
@@ -64,83 +108,6 @@ function formatReportResponse(report) {
         created_at: report.created_at,
     };
 }
-
-// ─── POST /predict ──────────────────────────────────────────────────────────
-router.post("/predict", upload.single("photo"), async (req, res) => {
-    try {
-        const {
-            source = "web", name, phone, category, description,
-            specific_details, district, city, area, latitude, longitude,
-        } = req.body;
-
-        const shortId = uuidv4().replace(/-/g, "").slice(0, 6);
-        const trackingId = `CP-${shortId}`;
-
-        let severity, priorityScore, predictedEscalation, escalationConfidence;
-
-        if (category === "flood") {
-            const floodRisk = await getFloodRiskFromComplaint({
-                district, place_name: area || city, latitude, longitude
-            });
-            if (floodRisk) {
-                severity = floodRisk.risk_level === "HIGH" ? "CRITICAL" : floodRisk.risk_level === "MODERATE" ? "HIGH" : "MEDIUM";
-                priorityScore = floodRisk.flood_probability;
-                predictedEscalation = floodRisk.flood_occurrence === "yes" ? "YES" : "NO";
-                escalationConfidence = floodRisk.confidence;
-            } else {
-                const triageResult = triage({ category, rawText: description, specificDetails: specific_details });
-                severity = triageResult.severity;
-                priorityScore = triageResult.priorityScore;
-                predictedEscalation = triageResult.predictedEscalation;
-                escalationConfidence = triageResult.escalationConfidence;
-            }
-        } else {
-            const triageResult = triage({ category, rawText: description, specificDetails: specific_details });
-            severity = triageResult.severity;
-            priorityScore = triageResult.priorityScore;
-            predictedEscalation = triageResult.predictedEscalation;
-            escalationConfidence = triageResult.escalationConfidence;
-        }
-
-        let status;
-        if (severity === "CRITICAL") status = "Dispatched";
-        else if (severity === "HIGH") status = "Under Review";
-        else status = "Registered";
-
-        const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
-
-        const report = await Report.create({
-            tracking_id: trackingId,
-            source, name, phone, category,
-            raw_text: description,
-            specific_details,
-            image_url: imageUrl,
-            district, city, area,
-            latitude: latitude ? parseFloat(latitude) : null,
-            longitude: longitude ? parseFloat(longitude) : null,
-            severity,
-            severity_raw: severity,
-            priority_score: priorityScore,
-            predicted_escalation: predictedEscalation,
-            escalation_confidence: escalationConfidence,
-            status,
-        });
-
-        res.json({
-            id: report.id,
-            tracking_id: report.tracking_id,
-            severity,
-            priority_score: priorityScore,
-            status,
-            predicted_escalation: predictedEscalation,
-            escalation_confidence: escalationConfidence,
-            message: "Complaint registered and triaged successfully",
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ detail: `Database error: ${err.message}` });
-    }
-});
 
 // ─── GET /reports ───────────────────────────────────────────────────────────
 router.get("/reports", async (req, res) => {
@@ -184,6 +151,15 @@ router.get("/reports/:id", async (req, res) => {
     if (!report) return res.status(404).json({ detail: "Report not found" });
 
     res.json(formatReportResponse(report));
+});
+
+// ─── DELETE /reports/:id ────────────────────────────────────────────────────
+router.delete("/reports/:id", async (req, res) => {
+    const report = await findReportByIdOrTracking(req.params.id);
+    if (!report) return res.status(404).json({ detail: "Report not found" });
+
+    await report.destroy();
+    res.json({ message: "Report deleted successfully" });
 });
 
 // ─── PATCH /reports/:id/status ──────────────────────────────────────────────

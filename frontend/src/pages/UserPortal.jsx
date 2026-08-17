@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
-import { syncReports } from "../services/api";
+import { syncReports, deleteComplaint } from "../services/api";
 
 const CATEGORY_META = {
   flood:         { title: "Flood & Drainage",  icon: "🌊" },
@@ -29,6 +29,9 @@ function mergeServerReport(local, remote) {
     status: remote.status || local.status,
     admin_reply: remote.admin_reply ?? null,
     severity: remote.severity || local.severity,
+    image_url: remote.image_url || local.image_url || local.photo_url || null,
+    photo_url: remote.photo_url || remote.image_url || local.photo_url || local.image_url || null,
+    ml_analysis: remote.ml_analysis || local.ml_analysis || null,
   };
 }
 
@@ -122,6 +125,26 @@ export default function UserPortal() {
     setEditingId(null);
   };
 
+  const handleDeleteComplaint = async (ticketId) => {
+    const idToDelete = String(ticketId);
+    const shouldDelete = window.confirm("Delete this complaint from your portal?");
+    if (!shouldDelete) return;
+
+    try {
+      await deleteComplaint(idToDelete);
+    } catch (err) {
+      console.error("Failed to delete complaint from server:", err);
+      alert("Warning: Could not delete complaint from server, but it will be removed locally.");
+    }
+
+    const updated = loadComplaints().filter((item) => {
+      return item.id !== idToDelete && item.tracking_id !== idToDelete;
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setComplaints(updated);
+  };
+
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div className="glass-card" style={{ padding: 24, marginBottom: 20 }}>
@@ -162,6 +185,41 @@ export default function UserPortal() {
                 </div>
 
                 <div className="ticket-desc">{item.description || "No complaint details saved."}</div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDeleteComplaint(item.id || item.tracking_id);
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: "1px solid rgba(248, 113, 113, 0.45)",
+                      background: "rgba(127, 29, 29, 0.2)",
+                      color: "#fca5a5",
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Delete complaint
+                  </button>
+                </div>
+
+                {(item.image_url || item.photo_url) && (
+                  <div style={{ marginTop: 14, borderRadius: 12, overflow: "hidden", border: "1px solid rgba(96,165,250,0.35)", background: "rgba(15,23,42,0.7)" }}>
+                    <div style={{ padding: "8px 12px", fontSize: "0.72rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#93c5fd", borderBottom: "1px solid rgba(96,165,250,0.25)" }}>
+                      Uploaded image
+                    </div>
+                    <img
+                      src={item.image_url?.startsWith("http") ? item.image_url : `http://127.0.0.1:8000${item.image_url?.startsWith("/") ? item.image_url : `/${item.image_url || item.photo_url}`}`}
+                      alt="Complaint upload"
+                      style={{ display: "block", width: "100%", maxHeight: 300, objectFit: "cover" }}
+                    />
+                  </div>
+                )}
 
                 {/* ── Official Admin Reply ── */}
                 {item.admin_reply ? (

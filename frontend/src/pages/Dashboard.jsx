@@ -77,6 +77,7 @@ export default function Dashboard() {
   const [replySaving, setReplySaving] = useState(null);
   const [replySuccess, setReplySuccess] = useState(null);
   const [expandedFlood, setExpandedFlood] = useState(null);
+  const [expandedLogId, setExpandedLogId] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -91,7 +92,7 @@ export default function Dashboard() {
       // Fallback: try localStorage
       try {
         const stored = JSON.parse(localStorage.getItem("civic_pulse_user_complaints") || "[]");
-        if (stored.length > 0) setComplaints(stored);
+        setComplaints(stored);
       } catch (_) { }
     } finally {
       setLoading(false);
@@ -124,6 +125,49 @@ export default function Dashboard() {
     (c) => c.severity === "CRITICAL" || c.severity === "HIGH"
   ).length;
   const resolvedCount = stats?.resolved_count ?? complaints.filter((c) => c.status === "Resolved").length;
+
+  const getReportKey = (report) => String(report?.id ?? report?.tracking_id ?? "");
+
+  const resolveAiSeverity = (report) => {
+    const direct = report?.severity || report?.severity_raw;
+    if (direct && direct !== "PENDING") return String(direct).toUpperCase();
+
+    const rawMl = report?.ml_analysis || {};
+    const ml = typeof rawMl === "string" ? (() => { try { return JSON.parse(rawMl); } catch { return {}; } })() : rawMl;
+    const floodRisk = report?.risk_signals?.floodRisk || {};
+    const nested = ml?.risk_level || ml?.severity || floodRisk?.risk_level || ml?.predicted_class || ml?.forced_min_priority;
+    if (nested) return String(nested).toUpperCase();
+
+    if (ml?.confidence != null) {
+      const value = Number(ml.confidence);
+      if (value >= 0.8) return "HIGH";
+      if (value >= 0.5) return "MEDIUM";
+      return "LOW";
+    }
+
+    if (ml?.image_damage_score != null || ml?.final_image_severity_score != null) {
+      const value = Number(ml.image_damage_score || ml.final_image_severity_score);
+      if (value >= 0.6 || value >= 3) return "HIGH";
+      if (value >= 0.3 || value >= 1.5) return "MEDIUM";
+      return "LOW";
+    }
+
+    return "PENDING";
+  };
+
+  const resolvePriorityScore = (report) => {
+    if (typeof report?.priority_score === "number") return report.priority_score;
+
+    const ml = report?.ml_analysis || {};
+    const floodRisk = report?.risk_signals?.floodRisk || {};
+    const value = ml?.flood_probability ?? ml?.confidence ?? floodRisk?.flood_probability ?? floodRisk?.confidence;
+
+    if (typeof value === "number") return Number(Math.min(Math.max(value, 0), 1).toFixed(2));
+    if (ml?.image_damage_score != null) {
+      return Number(Math.min(Math.max(Number(ml.image_damage_score) / 10, 0.15), 0.95).toFixed(2));
+    }
+    return 0;
+  };
 
   // ─── Status update handler ────────────────────────────────────────────────
   const handleStatusChange = async (reportId, newStatus) => {
@@ -331,10 +375,13 @@ export default function Dashboard() {
               <tbody>
                 {filteredComplaints.map((item) => {
                   const catMeta = CATEGORY_META[item.category] || {};
+                  const aiSeverity = resolveAiSeverity(item);
+                  const priorityValue = resolvePriorityScore(item);
                   return (
                     <tr
-                      key={item.id}
-                      style={{ borderBottom: "1px solid #1e293b", transition: "background 0.12s" }}
+                      key={getReportKey(item)}
+                      onClick={() => setExpandedLogId((prev) => (prev === getReportKey(item) ? null : getReportKey(item)))}
+                      style={{ borderBottom: "1px solid #1e293b", transition: "background 0.12s", cursor: "pointer" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.025)"}
                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                     >
@@ -358,16 +405,19 @@ export default function Dashboard() {
                         </div>
                       </td>
                       <td style={{ padding: "14px", minWidth: 180 }}>
-                        <SeverityPill severity={item.severity} />
-                        {item.priority_score > 0 && (
+                        <SeverityPill severity={aiSeverity} />
+                        {priorityValue > 0 && (
                           <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>
-                            Risk Score: <strong style={{ color: "#cbd5e1" }}>{(item.priority_score * 100).toFixed(0)}%</strong>
+                            Risk Score: <strong style={{ color: "#cbd5e1" }}>{(priorityValue * 100).toFixed(0)}%</strong>
                           </div>
                         )}
                         {item.category === "flood" && (
                           <div style={{ marginTop: 6 }}>
                             <button
-                              onClick={() => setExpandedFlood(expandedFlood === item.id ? null : item.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setExpandedFlood(expandedFlood === item.id ? null : item.id);
+                              }}
                               style={{ fontSize: "0.7rem", background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.4)", color: "#93c5fd", borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}
                             >
                               🤖 ML Details {expandedFlood === item.id ? "▲" : "▼"}
@@ -463,6 +513,7 @@ export default function Dashboard() {
                               rows={2}
                               value={replyDrafts[item.id] !== undefined ? replyDrafts[item.id] : ""}
                               onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                              onClick={(event) => event.stopPropagation()}
                               placeholder="Type a reply to the citizen…"
                               style={{
                                 width: "100%",
@@ -478,7 +529,10 @@ export default function Dashboard() {
                               }}
                             />
                             <button
-                              onClick={() => handleReplySubmit(item.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleReplySubmit(item.id);
+                              }}
                               disabled={replySaving === item.id || !replyDrafts[item.id]?.trim()}
                               style={{
                                 marginTop: 6,
@@ -513,7 +567,90 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Pulse animation for skeleton */}
+      {expandedLogId && (() => {
+        const item = complaints.find((report) => getReportKey(report) === String(expandedLogId)) || filteredComplaints.find((report) => getReportKey(report) === String(expandedLogId));
+        if (!item) return null;
+
+        const rawMlData = item.ml_analysis || item.ai_analysis || {};
+        const mlData = typeof rawMlData === "string" ? (() => { try { return JSON.parse(rawMlData); } catch { return {}; } })() : rawMlData;
+        const descriptionText = item.raw_text ?? item.description ?? item.specific_details ?? "No user description provided.";
+        const summaryText = descriptionText || "No user description provided.";
+        const imageUrl = item.image_url
+          ? item.image_url.startsWith("http")
+            ? item.image_url
+            : `http://127.0.0.1:8000${item.image_url.startsWith("/") ? item.image_url : `/${item.image_url}`}`
+          : item.photo_url
+            ? item.photo_url.startsWith("http")
+              ? item.photo_url
+              : `http://127.0.0.1:8000${item.photo_url.startsWith("/") ? item.photo_url : `/${item.photo_url}`}`
+            : null;
+
+        return (
+          <div className="glass-card" style={{ marginTop: 20, padding: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
+              <div>
+                <div style={{ fontSize: "0.72rem", letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase" }}>Complaint detail</div>
+                <h3 style={{ margin: "6px 0 0" }}>{item.tracking_id || item.id}</h3>
+              </div>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setExpandedLogId(null)}
+                style={{ fontSize: "0.8rem", padding: "8px 12px" }}
+              >
+                Close preview
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
+              <div style={{ background: "rgba(15,23,42,0.75)", border: "1px solid #334155", borderRadius: 12, padding: 16 }}>
+                <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 10 }}>Citizen details</div>
+                <div style={{ display: "grid", gap: 8, color: "#e2e8f0" }}>
+                  <div><strong style={{ color: "#94a3b8" }}>Name:</strong> {item.name || "—"}</div>
+                  <div><strong style={{ color: "#94a3b8" }}>Phone:</strong> {item.phone || "—"}</div>
+                  <div><strong style={{ color: "#94a3b8" }}>NIC:</strong> {item.nic || "—"}</div>
+                  <div><strong style={{ color: "#94a3b8" }}>Category:</strong> {item.category_label || item.category || "—"}</div>
+                  <div><strong style={{ color: "#94a3b8" }}>Location:</strong> {item.area || "—"}{item.city || item.district ? `, ${[item.city, item.district].filter(Boolean).join(", ")}` : ""}</div>
+                  <div><strong style={{ color: "#94a3b8" }}>Status:</strong> {item.status || "Registered"}</div>
+                  <div><strong style={{ color: "#94a3b8" }}>Severity:</strong> {item.severity || "PENDING"}</div>
+                </div>
+              </div>
+
+              <div style={{ background: "rgba(15,23,42,0.75)", border: "1px solid #334155", borderRadius: 12, padding: 16 }}>
+                <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 10 }}>User description</div>
+                <p style={{ color: "#e2e8f0", whiteSpace: "pre-wrap", lineHeight: 1.7, margin: 0 }}>{summaryText}</p>
+              </div>
+
+              <div style={{ background: "rgba(15,23,42,0.75)", border: "1px solid #334155", borderRadius: 12, padding: 16 }}>
+                <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 10 }}>Uploaded image</div>
+                {imageUrl ? (
+                  <img src={imageUrl} alt="Complaint upload" style={{ width: "100%", maxWidth: 320, height: 220, objectFit: "cover", borderRadius: 10, border: "1px solid #475569" }} />
+                ) : (
+                  <div style={{ color: "#64748b" }}>No uploaded image</div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 18, background: "rgba(15,23,42,0.75)", border: "1px solid #334155", borderRadius: 12, padding: 16 }}>
+              <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 12 }}>ML prediction details</div>
+              {!mlData || Object.keys(mlData).length === 0 ? (
+                <div style={{ color: "#64748b" }}>No ML prediction result stored for this complaint.</div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                  {Object.entries(mlData).map(([key, value]) => (
+                    <div key={key} style={{ background: "rgba(30,41,59,0.65)", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
+                      <div style={{ color: "#94a3b8", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{key}</div>
+                      <div style={{ color: "#f8fafc", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                        {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 0.4; }

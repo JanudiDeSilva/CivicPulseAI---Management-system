@@ -16,6 +16,7 @@ import cors from "cors";
 import { connectDB } from "./src/config/db.js";
 import { syncModels } from "./src/models/index.js";
 import reportsRouter from "./src/routes/reports.js";
+import predictRouter from "./src/routes/predict.js";
 import statsRouter from "./src/routes/stats.js";
 import incidentsRouter from "./src/routes/incidents.js";
 import mapRouter from "./src/routes/map.js";
@@ -42,6 +43,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use(reportsRouter);
+app.use(predictRouter);
 app.use(statsRouter);
 app.use(incidentsRouter);
 app.use(mapRouter);
