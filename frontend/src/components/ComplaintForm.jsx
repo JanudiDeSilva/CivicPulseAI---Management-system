@@ -177,7 +177,7 @@ export default function ComplaintForm() {
       case "flood":
         return `Depth: ${categoryDetails.floodDepth} | Cause: ${categoryDetails.drainageStatus} | Zone: ${categoryDetails.affectedImpact} | Water in Houses: ${categoryDetails.waterEntering}`;
       case "garbage":
-        return `Waste Type: ${categoryDetails.wasteType} | Condition: ${categoryDetails.dumpsterStatus} | Duration: ${categoryDetails.accumulationDuration} | Hazard: ${categoryDetails.healthHazard}`;
+        return `Condition: ${categoryDetails.dumpsterStatus} | Duration: ${categoryDetails.accumulationDuration} | Hazard: ${categoryDetails.healthHazard}`;
       case "road_damage":
         return `Damage Type: ${categoryDetails.damageType} | Size: ${categoryDetails.potholeSize} | Road: ${categoryDetails.roadClass} | Risk: ${categoryDetails.hazardLevel}`;
       case "power_failure":
@@ -913,24 +913,6 @@ export default function ComplaintForm() {
               <div className="grid-2">
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">
-                    Specific Type of Waste *
-                  </label>
-                  <select
-                    name="wasteType"
-                    value={categoryDetails.wasteType}
-                    onChange={handleDetailChange}
-                    className="form-select"
-                  >
-                    <option value="Household Organic & Food Waste">Household Organic &amp; Food Waste</option>
-                    <option value="Bulk Construction & Demolition Debris">Bulk Construction &amp; Demolition Debris</option>
-                    <option value="Commercial Plastics & Packaging Materials">Commercial Plastics &amp; Packaging</option>
-                    <option value="Hazardous, Medical or E-Waste">Hazardous, Medical or E-Waste</option>
-                    <option value="Dead Animal Carcass">Dead Animal Carcass</option>
-                  </select>
-                </div>
- 
-                <div className="form-group" style={{ marginBottom: 12 }}>
-                  <label className="form-label">
                     Waste Dump / Bin Condition *
                   </label>
                   <select
@@ -1293,34 +1275,180 @@ export default function ComplaintForm() {
               </label>
             </div>
  
-            {/* --- ADDED: AI garbage classification result (only shown for the Garbage category) --- */}
+            {/* --- AI Waste Analysis Panel (garbage category only) --- */}
+
+            {/* Loading state */}
             {form.category === "garbage" && garbageLoading && (
-              <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: 8 }}>
-                🤖 Analyzing photo with AI...
-              </p>
-            )}
-            {form.category === "garbage" && garbageError && (
-              <p style={{ fontSize: "0.85rem", color: "#f87171", marginTop: 8 }}>
-                AI check unavailable: {garbageError}
-              </p>
-            )}
-            {form.category === "garbage" && garbageResult && (
               <div
                 style={{
-                  marginTop: 10,
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  backgroundColor: "rgba(5, 150, 105, 0.1)",
-                  border: "1px solid rgba(16, 185, 129, 0.4)",
-                  fontSize: "0.85rem",
-                  color: "#f8fafc"
+                  marginTop: 14,
+                  padding: "14px 18px",
+                  borderRadius: 12,
+                  backgroundColor: "rgba(5, 150, 105, 0.08)",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  color: "#6ee7b7",
+                  fontSize: "0.88rem"
                 }}
               >
-                🤖 AI Detected: <strong>{garbageResult.predicted_class}</strong>{" "}
-                ({(garbageResult.confidence * 100).toFixed(1)}% confidence)
+                <span style={{ fontSize: 20, animation: "spin 1.2s linear infinite", display: "inline-block" }}>⏳</span>
+                <span>🤖 Analysing photo with AI waste classifier…</span>
               </div>
             )}
-            {/* --- END ADDED --- */}
+
+            {/* Error state */}
+            {form.category === "garbage" && garbageError && (
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  backgroundColor: "rgba(239, 68, 68, 0.08)",
+                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                  color: "#f87171",
+                  fontSize: "0.85rem"
+                }}
+              >
+                ⚠️ AI classification unavailable: {garbageError}
+              </div>
+            )}
+
+            {/* Full AI Waste Analysis result */}
+            {form.category === "garbage" && garbageResult && garbageResult.all_class_scores && (() => {
+              // Derive sorted entries, filter to >= 1% threshold
+              const allSorted = Object.entries(garbageResult.all_class_scores)
+                .sort(([, a], [, b]) => b - a);
+              const otherPredictions = allSorted.filter(
+                ([className, score]) => className !== garbageResult.predicted_class && score >= 0.01
+              );
+
+              const ScoreRow = ({ className, score, isTop }) => {
+                const pct = (score * 100).toFixed(1);
+                return (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+                      <span style={{
+                        fontSize: "0.82rem",
+                        color: isTop ? "#a7f3d0" : "#cbd5e1",
+                        fontWeight: isTop ? 700 : 500,
+                        textTransform: "capitalize"
+                      }}>
+                        {className}
+                      </span>
+                      <span style={{
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                        color: isTop ? "#6ee7b7" : "#94a3b8"
+                      }}>
+                        {pct}%
+                      </span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%",
+                        width: `${pct}%`,
+                        borderRadius: 4,
+                        background: isTop
+                          ? "linear-gradient(90deg, #059669, #34d399)"
+                          : "linear-gradient(90deg, #334155, #475569)",
+                        transition: "width 0.6s ease"
+                      }} />
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div
+                  style={{
+                    marginTop: 16,
+                    borderRadius: 14,
+                    overflow: "hidden",
+                    border: "1px solid rgba(16, 185, 129, 0.45)",
+                    backgroundColor: "rgba(5, 150, 105, 0.07)",
+                    boxShadow: "0 4px 24px rgba(5, 150, 105, 0.12)"
+                  }}
+                >
+                  {/* Panel header */}
+                  <div style={{
+                    background: "linear-gradient(135deg, rgba(5, 150, 105, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)",
+                    borderBottom: "1px solid rgba(16, 185, 129, 0.3)",
+                    padding: "13px 18px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10
+                  }}>
+                    <span style={{ fontSize: 20 }}>🤖</span>
+                    <span style={{ fontWeight: 700, fontSize: "0.97rem", color: "#ecfdf5", letterSpacing: "0.01em" }}>
+                      AI Waste Analysis
+                    </span>
+                  </div>
+
+                  <div style={{ padding: "14px 18px 4px" }}>
+                    {/* Top prediction */}
+                    <div style={{
+                      fontSize: "0.75rem",
+                      color: "#6ee7b7",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      fontWeight: 600,
+                      marginBottom: 8
+                    }}>
+                      Top Prediction
+                    </div>
+                    <div style={{
+                      padding: "10px 12px",
+                      borderRadius: 9,
+                      backgroundColor: "rgba(16, 185, 129, 0.1)",
+                      border: "1px solid rgba(16, 185, 129, 0.3)",
+                      marginBottom: 14
+                    }}>
+                      <ScoreRow
+                        className={garbageResult.predicted_class}
+                        score={garbageResult.confidence}
+                        isTop={true}
+                      />
+                    </div>
+
+                    {/* Other meaningful predictions */}
+                    {otherPredictions.length > 0 && (
+                      <>
+                        <div style={{
+                          fontSize: "0.75rem",
+                          color: "#94a3b8",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          fontWeight: 600,
+                          marginBottom: 8
+                        }}>
+                          Other Possible Predictions
+                        </div>
+                        {otherPredictions.map(([className, score]) => (
+                          <ScoreRow key={className} className={className} score={score} isTop={false} />
+                        ))}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Disclaimer note */}
+                  <div style={{
+                    margin: "10px 18px 14px",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    backgroundColor: "rgba(15, 23, 42, 0.5)",
+                    border: "1px solid rgba(51, 65, 85, 0.6)",
+                    fontSize: "0.72rem",
+                    color: "#64748b",
+                    lineHeight: 1.55
+                  }}>
+                    ℹ️ These percentages represent the AI model's classification scores. They do not represent the physical quantity or percentage of material in the image.
+                  </div>
+                </div>
+              );
+            })()}
+            {/* --- END AI Waste Analysis Panel --- */}
           </div>
  
           {/* Submit Button */}
