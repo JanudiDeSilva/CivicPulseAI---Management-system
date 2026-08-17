@@ -41,7 +41,7 @@ export default function AuthPage() {
     try {
       setLoading(true);
       setError("");
-      signupUser(signupForm);
+      await signupUser(signupForm);
       setMode("signin");
       setSuccessMessage("Registration complete. Please sign in with your new credentials.");
       setSignupForm(initialSignup);
@@ -68,7 +68,7 @@ export default function AuthPage() {
         }
       }
 
-      loginWithPassword(loginForm);
+      await loginWithPassword(loginForm);
     } catch (err) {
       setError(err.message);
     } finally {

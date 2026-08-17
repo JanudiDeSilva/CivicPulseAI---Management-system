@@ -1,9 +1,85 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: "/", // Use proxy
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add error interceptor for better debugging
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API Error:', error.message);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ML Service API (Python/FastAPI) - for direct AI service calls
+const mlApi = axios.create({
+  baseURL: "http://127.0.0.1:8001",
   timeout: 15000,
 });
+
+// Export ML API for direct access to AI services
+export { mlApi };
+
+// Add ML service direct access functions
+export const mlService = {
+  predictGarbage: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await mlApi.post("/predict-garbage", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return response.data;
+  },
+  
+  predictRoadDamage: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await mlApi.post("/analyze-road-damage", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return response.data;
+  },
+
+  getFloodRisk: async (data) => {
+    const response = await mlApi.post("/predict-from-complaint", data);
+    return response.data;
+  }
+};
+
+// Authentication API
+export const authService = {
+  register: async (userData) => {
+    const response = await api.post("/register", userData);
+    return response.data;
+  },
+
+  login: async (credentials) => {
+    const response = await api.post("/login", credentials);
+    return response.data;
+  },
+
+  requestOtp: async (email) => {
+    const response = await api.post("/otp/request", { email });
+    return response.data;
+  },
+
+  getUser: async (userId) => {
+    const response = await api.get(`/user/${userId}`);
+    return response.data;
+  }
+};
 
 // Fetch all reports (with optional filters)
 export const fetchReports = (params = {}) =>

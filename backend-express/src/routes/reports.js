@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Report } from '../models/index.js';
+import multer from 'multer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +11,91 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 const uploadDir = path.join(__dirname, '../../uploads');
+
+// Ensure upload directory exists
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// Get all reports
+router.get('/reports', async (_req, res) => {
+    try {
+        const reports = await Report.findAll({
+            order: [['created_at', 'DESC']]
+        });
+        res.json(reports);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch reports', details: error.message });
+    }
+});
+
+// Get single report by ID
+router.get('/reports/:id', async (req, res) => {
+    try {
+        const report = await Report.findByPk(req.params.id);
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        res.json(report);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch report', details: error.message });
+    }
+});
+
+// Create new report with image upload
+router.post('/reports', upload.single('image'), async (req, res) => {
+    try {
+        const { 
+            name, 
+            phone, 
+            raw_text, 
+            specific_details, 
+            latitude, 
+            longitude, 
+            district, 
+            city, 
+            area, 
+            category, 
+            severity_raw 
+        } = req.body;
+
+        const imageUrl = req.file ? req.file.filename : null;
+
+        const report = await Report.create({
+            name,
+            phone,
+            raw_text,
+            specific_details,
+            image_url: imageUrl,
+            latitude: latitude ? parseFloat(latitude) : null,
+            longitude: longitude ? parseFloat(longitude) : null,
+            district,
+            city,
+            area,
+            category,
+            severity_raw,
+            status: 'Registered'
+        });
+
+        res.status(201).json(report);
+    } catch (error) {
+        console.error('Error creating report:', error);
+        res.status(500).json({ error: 'Failed to create report', details: error.message });
+    }
+});
 
 // Existing routes...
 
@@ -19,7 +105,7 @@ router.delete('/reports/:id', async (req, res) => {
     try {
         const complaint = await Report.findByPk(complaintId);
         if (!complaint) {
-            return res.status(404).send('Complaint not found');
+            return res.status(404).json({ error: 'Complaint not found' });
         }
 
         const imageFilename = complaint.image_url;
@@ -31,9 +117,10 @@ router.delete('/reports/:id', async (req, res) => {
         }
 
         await complaint.destroy();
-        res.send('Complaint deleted');
+        res.json({ message: 'Complaint deleted successfully' });
     } catch (error) {
-        res.status(500).send('Server error');
+        console.error('Error deleting complaint:', error);
+        res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
 
@@ -45,7 +132,7 @@ router.get('/images/:filename', (req, res) => {
     if (fs.existsSync(filepath)) {
         res.sendFile(filepath);
     } else {
-        res.status(404).send('Image not found');
+        res.status(404).json({ error: 'Image not found' });
     }
 });
 

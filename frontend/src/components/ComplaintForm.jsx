@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { submitComplaint } from "../services/api";
+import { submitComplaint, mlService } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 import floodImg from "../assets/flood.jpeg";
@@ -131,7 +131,6 @@ export default function ComplaintForm() {
   const [garbageResult, setGarbageResult] = useState(null);
   const [garbageLoading, setGarbageLoading] = useState(false);
   const [garbageError, setGarbageError] = useState(null);
-  const GARBAGE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:8001";
   // --- END ADDED ---
  
   const currentCategory = ISSUE_CATEGORIES.find((c) => c.id === form.category);
@@ -296,17 +295,10 @@ export default function ComplaintForm() {
     setGarbageLoading(true);
     setGarbageError(null);
     setGarbageResult(null);
- 
-    const formData = new FormData();
-    formData.append("file", file);
- 
+
     try {
-      const res = await fetch(`${GARBAGE_API_URL}/predict-garbage`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
- 
+      const data = await mlService.predictGarbage(file);
+
       if (data.error) {
         setGarbageError(data.error);
       } else {
