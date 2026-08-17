@@ -453,42 +453,15 @@ export default function ComplaintForm() {
         date: new Date().toLocaleString()
       });
     } catch (err) {
-      console.warn("Backend unavailable, using demo fallback:", err);
+      // Backend unreachable — show informative failure instead of fake ML results.
+      console.warn("Backend unavailable:", err);
       setLoading(false);
-      setCountdown(5);
-
-      const demoMlAnalysis = form.category === "road_damage" ? {
-        type: "road_damage",
-        detections: [
-          { class: "manhole", confidence: 0.438, area_ratio: 0.0403, severity_tier: "moderate", combined_score: 0.121 },
-          { class: "crack", confidence: 0.406, area_ratio: 0.6278, severity_tier: "severe", combined_score: 0.6278 },
-          { class: "pothole", confidence: 0.415, area_ratio: 0.0747, severity_tier: "moderate", combined_score: 0.1494 },
-        ],
-        category_match: true,
-        final_image_severity_score: 0.6278,
-        manhole_detected: true,
-        forced_min_priority: "High",
-      } : null;
-
-      setSubmissionSuccess({
-        trackingId,
-        category: form.category,
-        severity: form.category === "road_damage" ? "CRITICAL" : "MEDIUM",
-        priorityScore: form.category === "road_damage" ? 0.6278 : 0.5,
-        predictedEscalation: form.category === "road_damage" ? "MATCH" : "NO",
-        isActualDamage: form.category === "road_damage" ? true : null,
-        mlAnalysis: demoMlAnalysis,
-        status: form.category === "road_damage" ? "Dispatched" : "Registered",
-        categoryLabel: currentCategory.label,
-        categoryIcon: currentCategory.icon,
-        name: form.name,
-        phone: form.phone,
-        district: form.district,
-        city: form.city,
-        area: form.area,
-        specificSummary,
-        date: new Date().toLocaleString()
-      });
+      alert(
+        "⚠️ Could not reach the CivicPulse server right now.\n\n" +
+        "Your complaint was saved locally, but AI triage needs the server.\n" +
+        "Please try again in a moment."
+      );
+      navigate("/");
     }
   };
  

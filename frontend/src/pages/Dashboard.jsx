@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchReports, fetchStats, updateReportStatus, updateReportReply } from "../services/api";
+import { fetchReports, fetchStats, fetchIncidents, updateReportStatus, updateReportReply, updateIncidentReply } from "../services/api";
 import MapView from "../components/MapView";
 
 const CATEGORY_META = {
@@ -51,7 +51,7 @@ function StatusBadge({ status }) {
 function SkeletonRow() {
   return (
     <tr style={{ borderBottom: "1px solid #1e293b" }}>
-      {[...Array(7)].map((_, i) => (
+      {[...Array(8)].map((_, i) => (
         <td key={i} style={{ padding: "16px" }}>
           <div style={{
             height: 14, borderRadius: 6, background: "rgba(255,255,255,0.06)",
@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [activeStatus, setActiveStatus] = useState("All");
   const [complaints, setComplaints] = useState([]);
   const [stats, setStats] = useState(null);
+  const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
   const [showMap, setShowMap] = useState(false);
@@ -77,13 +78,21 @@ export default function Dashboard() {
   const [replySaving, setReplySaving] = useState(null);
   const [replySuccess, setReplySuccess] = useState(null);
   const [expandedFlood, setExpandedFlood] = useState(null);
+  const [expandedImage, setExpandedImage] = useState(null);
+  const [expandedML, setExpandedML] = useState(null);
+  const [incidentReplyDrafts, setIncidentReplyDrafts] = useState({});
+  const [incidentReplySaving, setIncidentReplySaving] = useState(null);
+  const [incidentReplySuccess, setIncidentReplySuccess] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [reportsRes, statsRes] = await Promise.all([fetchReports(), fetchStats()]);
+      const [reportsRes, statsRes, incidentsRes] = await Promise.all([
+        fetchReports(), fetchStats(), fetchIncidents()
+      ]);
       setComplaints(reportsRes.data.reports || []);
       setStats(statsRes.data);
+      setIncidents(incidentsRes.data.incidents || []);
       setLastRefresh(new Date());
     } catch (err) {
       console.error("Dashboard fetch error:", err);
@@ -110,6 +119,13 @@ export default function Dashboard() {
     const catMatch = activeCategory === "all" || c.category === activeCategory;
     const statusMatch = activeStatus === "All" || c.status === activeStatus;
     return catMatch && statusMatch;
+  });
+
+  // Sort by priority (severity score desc) so highest risk appears first
+  const sortedComplaints = [...filteredComplaints].sort((a, b) => {
+    const scoreA = a.severity_score ?? a.priority_score ?? 0;
+    const scoreB = b.severity_score ?? b.priority_score ?? 0;
+    return scoreB - scoreA;
   });
 
   // ─── Category stats (from DB stats or computed from complaints) ───────────
@@ -160,6 +176,27 @@ export default function Dashboard() {
     }
   };
 
+  // Send the same reply to ALL reports in a duplicate incident group
+  const handleIncidentReplySubmit = async (incidentId) => {
+    const replyText = incidentReplyDrafts[incidentId] ?? "";
+    setIncidentReplySaving(incidentId);
+    try {
+      await updateIncidentReply(incidentId, replyText);
+      // Update all reports in this incident group
+      setComplaints((prev) =>
+        prev.map((c) =>
+          c.incident_id === incidentId ? { ...c, admin_reply: replyText } : c
+        )
+      );
+      setIncidentReplySuccess(incidentId);
+      setTimeout(() => setIncidentReplySuccess(null), 2500);
+    } catch (err) {
+      console.error("Incident reply save failed:", err);
+    } finally {
+      setIncidentReplySaving(null);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", textAlign: "left" }}>
 
@@ -168,7 +205,7 @@ export default function Dashboard() {
         <div>
           <h1 style={{ fontSize: "2.1rem", margin: 0 }}> Admin Dashboard</h1>
           <p style={{ marginTop: 4, color: "var(--text-muted)", fontSize: "0.9rem" }}>
-            Real-time triage and field dispatch overview.
+            Real-time AI triage, priority prediction & duplicate detection.
             {lastRefresh && (
               <span style={{ marginLeft: 8, opacity: 0.7 }}>
                 Last synced: {lastRefresh.toLocaleTimeString()}
@@ -190,6 +227,10 @@ export default function Dashboard() {
             <span style={{ fontSize: "0.7rem", color: "#4ade80", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>Resolved</span>
             <strong style={{ fontSize: "1.5rem", color: "#22c55e" }}>{resolvedCount}</strong>
           </div>
+          <div className="glass-card" style={{ padding: "10px 18px", borderRadius: 12, borderColor: "rgba(139,92,246,0.4)", textAlign: "center" }}>
+            <span style={{ fontSize: "0.7rem", color: "#a78bfa", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>Merged Incidents</span>
+            <strong style={{ fontSize: "1.5rem", color: "#a78bfa" }}>{incidents.filter((i) => i.report_count > 1).length}</strong>
+          </div>
           <button
             onClick={loadData}
             className="btn btn-secondary"
@@ -208,6 +249,121 @@ export default function Dashboard() {
           color: "#f87171", fontSize: "0.88rem"
         }}>
           ⚠️ {error}
+        </div>
+      )}
+
+      {/* ─── Duplicate Incidents Panel ───────────────────────────────────── */}
+      {incidents.filter((i) => i.report_count > 1).length > 0 && (
+        <div className="glass-card" style={{ padding: 20, marginBottom: 24, borderColor: "rgba(139,92,246,0.4)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h3 style={{ margin: 0, fontSize: "1.05rem", color: "#a78bfa" }}>
+              🧩 Combined Incidents (Duplicate Detection)
+            </h3>
+            <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+              Multiple complaints about the same problem merged into one
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 }}>
+            {incidents
+              .filter((i) => i.report_count > 1)
+              .map((inc) => (
+                <div
+                  key={inc.incident_id}
+                  style={{
+                    padding: "14px 16px",
+                    borderRadius: 10,
+                    background: "rgba(139,92,246,0.08)",
+                    border: "1px solid rgba(139,92,246,0.3)"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontWeight: 700, color: "#e9d5ff", fontSize: "0.85rem" }}>
+                      {CATEGORY_META[inc.category]?.icon || "📋"} {CATEGORY_META[inc.category]?.title || inc.category}
+                    </span>
+                    <span style={{
+                      background: "rgba(139,92,246,0.25)", color: "#c4b5fd",
+                      borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700
+                    }}>
+                      {inc.report_count} reports
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                    TRK: <strong style={{ color: "#c4b5fd" }}>{inc.report_ids.join(", ").slice(0, 50)}</strong>
+                  </div>
+
+                  {/* Individual reports in this incident */}
+                  {(inc.reports || []).map((r) => (
+                    <div key={r.id} style={{
+                      marginTop: 8, padding: "8px 10px", borderRadius: 8,
+                      background: "rgba(15,23,42,0.5)", border: "1px solid rgba(139,92,246,0.2)",
+                      fontSize: "0.72rem"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <strong style={{ color: "#c4b5fd" }}>{r.tracking_id}</strong>
+                        <span style={{ color: "#94a3b8" }}>{r.name} · {r.submitted_at}</span>
+                      </div>
+                      <div style={{ color: "#94a3b8", marginTop: 3, fontSize: "0.68rem" }}>
+                        {r.specific_details || r.description || "—"}
+                      </div>
+                      {r.image_url && (
+                        <img
+                          src={r.image_url}
+                          alt="Report"
+                          style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", marginTop: 4, border: "1px solid #475569" }}
+                        />
+                      )}
+                      {r.admin_reply && (
+                        <div style={{ color: "#4ade80", marginTop: 4, fontSize: "0.68rem" }}>
+                          ✓ Replied: {r.admin_reply}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Reply to ALL reports in this incident */}
+                  <div style={{ marginTop: 10 }}>
+                    <textarea
+                      rows={2}
+                      value={incidentReplyDrafts[inc.incident_id] !== undefined ? incidentReplyDrafts[inc.incident_id] : ""}
+                      onChange={(e) => setIncidentReplyDrafts((prev) => ({ ...prev, [inc.incident_id]: e.target.value }))}
+                      placeholder={`Reply to all ${inc.report_count} citizens in this incident…`}
+                      style={{
+                        width: "100%",
+                        background: "rgba(15,23,42,0.7)",
+                        color: "#e2e8f0",
+                        border: "1px solid #334155",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        fontSize: "0.75rem",
+                        resize: "vertical",
+                        display: "block"
+                      }}
+                    />
+                    <button
+                      onClick={() => handleIncidentReplySubmit(inc.incident_id)}
+                      disabled={incidentReplySaving === inc.incident_id || !incidentReplyDrafts[inc.incident_id]?.trim()}
+                      style={{
+                        marginTop: 6,
+                        width: "100%",
+                        padding: "6px 10px",
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        borderRadius: 7,
+                        border: "none",
+                        cursor: (incidentReplySaving === inc.incident_id || !incidentReplyDrafts[inc.incident_id]?.trim()) ? "not-allowed" : "pointer",
+                        background: incidentReplySuccess === inc.incident_id
+                          ? "rgba(34,197,94,0.25)"
+                          : (!incidentReplyDrafts[inc.incident_id]?.trim() ? "rgba(139,92,246,0.05)" : "rgba(139,92,246,0.2)"),
+                        color: incidentReplySuccess === inc.incident_id ? "#4ade80" : (!incidentReplyDrafts[inc.incident_id]?.trim() ? "#64748b" : "#c4b5fd"),
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {incidentReplySaving === inc.incident_id ? "Sending to all…" : incidentReplySuccess === inc.incident_id ? "✓ Sent to all!" : `📨 Reply to all ${inc.report_count} reports`}
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
         </div>
       )}
 
@@ -284,9 +440,10 @@ export default function Dashboard() {
           <div>
             <h3 style={{ margin: 0 }}>Incident Logs</h3>
             <p style={{ fontSize: "0.83rem", marginTop: 3, color: "var(--text-muted)" }}>
-              Showing {filteredComplaints.length} report{filteredComplaints.length !== 1 ? "s" : ""}
+              Showing {sortedComplaints.length} report{sortedComplaints.length !== 1 ? "s" : ""}
               {activeCategory !== "all" && ` · ${CATEGORY_META[activeCategory]?.title}`}
               {activeStatus !== "All" && ` · ${activeStatus}`}
+              <span style={{ marginLeft: 8, color: "#f87171" }}>🔴 = High Priority (CRITICAL/HIGH)</span>
             </p>
           </div>
           {(activeCategory !== "all" || activeStatus !== "All") && (
@@ -308,7 +465,7 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
-        ) : filteredComplaints.length === 0 ? (
+        ) : sortedComplaints.length === 0 ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "#64748b" }}>
             <div style={{ fontSize: 36, marginBottom: 10 }}>📭</div>
             <p style={{ fontSize: "0.95rem" }}>No complaints found for the selected filters.</p>
@@ -318,28 +475,88 @@ export default function Dashboard() {
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #334155", color: "#94a3b8", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  <th style={{ padding: "10px 14px" }}>Priority</th>
                   <th style={{ padding: "10px 14px" }}>ID</th>
                   <th style={{ padding: "10px 14px" }}>Citizen</th>
                   <th style={{ padding: "10px 14px" }}>Category</th>
                   <th style={{ padding: "10px 14px" }}>Location</th>
                   <th style={{ padding: "10px 14px" }}>AI Severity</th>
+                  <th style={{ padding: "10px 14px" }}>Image</th>
                   <th style={{ padding: "10px 14px" }}>Status</th>
+                  <th style={{ padding: "10px 14px" }}>Duplicates</th>
                   <th style={{ padding: "10px 14px" }}>Reply</th>
                   <th style={{ padding: "10px 14px" }}>Submitted</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredComplaints.map((item) => {
+                {sortedComplaints.map((item) => {
                   const catMeta = CATEGORY_META[item.category] || {};
+                  const isHighPriority = item.severity === "CRITICAL" || item.severity === "HIGH";
+                  const isDuplicate = item.is_duplicate === true;
+
                   return (
                     <tr
                       key={item.id}
-                      style={{ borderBottom: "1px solid #1e293b", transition: "background 0.12s" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.025)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                      style={{
+                        borderBottom: "1px solid #1e293b",
+                        transition: "background 0.12s",
+                        // 🔴 RED HIGHLIGHT for high priority complaints —
+                        // the entire row turns red.
+                        background: isHighPriority
+                          ? "rgba(239, 68, 68, 0.10)"
+                          : isDuplicate
+                            ? "rgba(139, 92, 246, 0.06)"
+                            : "transparent",
+                        borderLeft: isHighPriority
+                          ? "4px solid rgba(239, 68, 68, 0.8)"
+                          : isDuplicate
+                            ? "4px solid rgba(139, 92, 246, 0.5)"
+                            : "4px solid transparent"
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = isHighPriority ? "rgba(239, 68, 68, 0.18)" : "rgba(255,255,255,0.025)"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = isHighPriority ? "rgba(239, 68, 68, 0.10)" : isDuplicate ? "rgba(139, 92, 246, 0.06)" : "transparent"}
                     >
-                      <td style={{ padding: "14px", fontWeight: 700, color: "#3b82f6", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                      {/* Priority Rank (1 = most critical) */}
+                      <td style={{ padding: "14px", textAlign: "center" }}>
+                        {item.priority_rank ? (
+                          <div style={{
+                            width: 32, height: 32, borderRadius: "50%",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: 800, fontSize: "0.95rem",
+                            background: item.priority_rank === 1
+                              ? "rgba(239,68,68,0.25)"
+                              : item.priority_rank === 2
+                                ? "rgba(249,115,22,0.25)"
+                                : item.priority_rank === 3
+                                  ? "rgba(234,179,8,0.25)"
+                                  : "rgba(34,197,94,0.25)",
+                            color: item.priority_rank === 1
+                              ? "#ef4444"
+                              : item.priority_rank === 2
+                                ? "#f97316"
+                                : item.priority_rank === 3
+                                  ? "#eab308"
+                                  : "#22c55e",
+                            border: `2px solid ${
+                              item.priority_rank === 1
+                                ? "rgba(239,68,68,0.6)"
+                                : item.priority_rank === 2
+                                  ? "rgba(249,115,22,0.6)"
+                                  : item.priority_rank === 3
+                                    ? "rgba(234,179,8,0.6)"
+                                    : "rgba(34,197,94,0.6)"
+                            }`,
+                            margin: "0 auto"
+                          }}>
+                            {item.priority_rank}
+                          </div>
+                        ) : (
+                          <span style={{ color: "#334155", fontSize: "0.8rem" }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: "14px", fontWeight: 700, color: isHighPriority ? "#ef4444" : "#3b82f6", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.tracking_id || item.id?.slice(0, 8)}
+                        {isHighPriority && <span style={{ marginLeft: 6, fontSize: "0.72rem", color: "#ef4444" }}>🔴</span>}
                       </td>
                       <td style={{ padding: "14px" }}>
                         <div style={{ fontWeight: 600, color: "#f8fafc", fontSize: "0.88rem" }}>{item.name || "—"}</div>
@@ -361,7 +578,9 @@ export default function Dashboard() {
                         <SeverityPill severity={item.severity} />
                         {item.priority_score > 0 && (
                           <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>
-                            Risk Score: <strong style={{ color: "#cbd5e1" }}>{(item.priority_score * 100).toFixed(0)}%</strong>
+                            Risk Score: <strong style={{ color: isHighPriority ? "#f87171" : "#cbd5e1" }}>
+                              {((item.severity_score ?? item.priority_score) * 100).toFixed(0)}%
+                            </strong>
                           </div>
                         )}
                         {item.category === "flood" && (
@@ -393,28 +612,123 @@ export default function Dashboard() {
                                     <span style={{ color: "#f8fafc" }}>{item.escalation_confidence ? (item.escalation_confidence * 100).toFixed(0) + "%" : "—"}</span>
                                   </div>
                                 </div>
-                                <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(59,130,246,0.2)", color: "#64748b", fontSize: "0.72rem" }}>
-  {/* Model Inputs */}
-  { (item.elevation_m != null || item.distance_to_river_m != null || item.rainfall_7d_mm != null || item.monthly_rainfall_mm != null || item.population_density_per_km2 != null || item.ndvi != null || item.ndwi != null) ? (
-    <div style={{ display: "grid", gap: "4px", marginTop: 4 }}>
-      {item.elevation_m != null && <div><strong>Elevation:</strong> {item.elevation_m} m</div>}
-      {item.distance_to_river_m != null && <div><strong>Dist. to River:</strong> {item.distance_to_river_m} m</div>}
-      {item.rainfall_7d_mm != null && <div><strong>Rainfall (7d):</strong> {item.rainfall_7d_mm} mm</div>}
-      {item.monthly_rainfall_mm != null && <div><strong>Monthly Rainfall:</strong> {item.monthly_rainfall_mm} mm</div>}
-      {item.population_density_per_km2 != null && <div><strong>Population Density:</strong> {item.population_density_per_km2} /km²</div>}
-      {item.ndvi != null && <div><strong>NDVI:</strong> {item.ndvi}</div>}
-      {item.ndwi != null && <div><strong>NDWI:</strong> {item.ndwi}</div>}
-    </div>
-  ) : (
-    <div>📡 Model inputs: district geo-features, live 7‑day rainfall from Open‑Meteo, elevation, distance to river, soil type, NDVI/NDWI indices & population density.</div>
-  )}
-</div>
                               </div>
                             )}
                           </div>
                         )}
                         {item.category !== "flood" && item.predicted_escalation === "YES" && (
                           <div style={{ fontSize: "0.7rem", color: "#f87171", marginTop: 3 }}>⚠ Escalation Risk</div>
+                        )}
+                        {/* ML Detections for ALL models */}
+                        {item.ml_analysis && (
+                          <div style={{ marginTop: 6 }}>
+                            <button
+                              onClick={() => setExpandedML(expandedML === item.id ? null : item.id)}
+                              style={{ fontSize: "0.7rem", background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.4)", color: "#c4b5fd", borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}
+                            >
+                              🤖 Model Detections {expandedML === item.id ? "▲" : "▼"}
+                            </button>
+                            {expandedML === item.id && (
+                              <div style={{ marginTop: 6, padding: "10px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(139,92,246,0.3)", borderRadius: 8, fontSize: "0.75rem" }}>
+                                {item.ml_analysis.type === "road_damage" && (
+                                  <>
+                                    <div style={{ color: "#fbbf24", fontWeight: 700, marginBottom: 6, fontSize: "0.78rem" }}>🚗 YOLOv8 Road Damage Detection</div>
+                                    <div style={{ display: "grid", gap: 4 }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Manhole Detected:</span>
+                                        <span style={{ color: item.ml_analysis.manhole_detected ? "#ef4444" : "#94a3b8", fontWeight: 700 }}>
+                                          {item.ml_analysis.manhole_detected ? "Yes — Critical" : "No"}
+                                        </span>
+                                      </div>
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Damage Score:</span>
+                                        <span style={{ color: "#f8fafc", fontWeight: 600 }}>
+                                          {(item.ml_analysis.final_image_severity_score * 100).toFixed(0)}%
+                                        </span>
+                                      </div>
+                                      {(item.ml_analysis.detections || []).map((d, i) => (
+                                        <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#cbd5e1" }}>
+                                          <span style={{ textTransform: "capitalize" }}>{d.class}</span>
+                                          <span>{(d.confidence * 100).toFixed(0)}% · {d.severity_tier}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                                {item.ml_analysis.type === "garbage" && (
+                                  <>
+                                    <div style={{ color: "#34d399", fontWeight: 700, marginBottom: 6, fontSize: "0.78rem" }}>🗑️ Garbage Classification Model</div>
+                                    <div style={{ display: "grid", gap: 4 }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Predicted Class:</span>
+                                        <span style={{ color: "#f8fafc", fontWeight: 700, textTransform: "capitalize" }}>
+                                          {item.ml_analysis.predicted_class}
+                                        </span>
+                                      </div>
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Confidence:</span>
+                                        <span style={{ color: "#f8fafc", fontWeight: 600 }}>
+                                          {(item.ml_analysis.confidence * 100).toFixed(0)}%
+                                        </span>
+                                      </div>
+                                      {item.ml_analysis.fallback && (
+                                        <div style={{ color: "#fbbf24", fontSize: "0.7rem" }}>⚠ Heuristic fallback used</div>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                                {item.ml_analysis.type === "flood" && (
+                                  <>
+                                    <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 6, fontSize: "0.78rem" }}>🌊 XGBoost Flood AI Model</div>
+                                    <div style={{ display: "grid", gap: 4 }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Flood Probability:</span>
+                                        <span style={{ color: "#f8fafc", fontWeight: 600 }}>
+                                          {(item.ml_analysis.flood_probability * 100).toFixed(1)}%
+                                        </span>
+                                      </div>
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Risk Level:</span>
+                                        <span style={{ color: item.ml_analysis.risk_level === "HIGH" ? "#ef4444" : item.ml_analysis.risk_level === "MODERATE" ? "#f97316" : "#eab308", fontWeight: 700 }}>
+                                          {item.ml_analysis.risk_level}
+                                        </span>
+                                      </div>
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Confidence:</span>
+                                        <span style={{ color: "#f8fafc" }}>
+                                          {(item.ml_analysis.confidence * 100).toFixed(0)}%
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      {/* User Uploaded Image */}
+                      <td style={{ padding: "14px", textAlign: "center" }}>
+                        {item.image_url ? (
+                          <div>
+                            <img
+                              src={item.image_url}
+                              alt="User upload"
+                              onClick={() => setExpandedImage(expandedImage === item.id ? null : item.id)}
+                              style={{
+                                width: 48, height: 48, borderRadius: 8, objectFit: "cover",
+                                cursor: "pointer", border: "1px solid #475569",
+                                transition: "all 0.2s"
+                              }}
+                            />
+                            {expandedImage === item.id && (
+                              <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15,23,42,0.9)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => setExpandedImage(null)}>
+                                <img src={item.image_url} alt="Full view" style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 12, border: "2px solid #475569" }} />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: "#334155", fontSize: "0.8rem" }}>—</span>
                         )}
                       </td>
                       <td style={{ padding: "14px" }}>
@@ -435,6 +749,30 @@ export default function Dashboard() {
                           <option value="Resolved">Resolved</option>
                           <option value="Closed">Closed</option>
                         </select>
+                      </td>
+                      <td style={{ padding: "14px", fontSize: "0.75rem" }}>
+                        {isDuplicate ? (
+                          <div style={{
+                            padding: "6px 10px", borderRadius: 8,
+                            background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.35)",
+                            color: "#c4b5fd"
+                          }}>
+                            <strong>🧩 Duplicate</strong>
+                            <div style={{ fontSize: "0.68rem", marginTop: 3 }}>
+                              Match: {(item.duplicate_similarity * 100).toFixed(0)}% · {item.incident_report_count} total
+                            </div>
+                          </div>
+                        ) : item.incident_report_count > 1 ? (
+                          <div style={{
+                            padding: "6px 10px", borderRadius: 8,
+                            background: "rgba(139,92,246,0.10)", border: "1px solid rgba(139,92,246,0.25)",
+                            color: "#a78bfa"
+                          }}>
+                            <strong>📦 Incident #{item.incident_report_count} reports</strong>
+                          </div>
+                        ) : (
+                          <span style={{ color: "#334155" }}>•</span>
+                        )}
                       </td>
                       <td style={{ padding: "14px", minWidth: 200 }}>
                         {item.admin_reply ? (

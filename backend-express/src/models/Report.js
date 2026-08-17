@@ -32,6 +32,23 @@ const Report = sequelize.define("Report", {
 
     status: { type: DataTypes.STRING, defaultValue: "Registered" },
     admin_reply: { type: DataTypes.TEXT, allowNull: true },
+
+    // ─── Priority prediction system fields ───
+    severity_score: { type: DataTypes.FLOAT, defaultValue: 0.0 },
+    risk_signals: { type: DataTypes.JSON, allowNull: true },
+
+    // ─── Priority rank (1 = most critical) ───
+    priority_rank: { type: DataTypes.INTEGER, allowNull: true },
+
+    // ─── ML analysis / model detections (JSON) ───
+    ml_analysis: { type: DataTypes.JSON, allowNull: true },
+
+    // ─── Duplicate detection fields ───
+    incident_id: { type: DataTypes.UUID, allowNull: true },
+    is_duplicate: { type: DataTypes.BOOLEAN, defaultValue: false },
+    duplicate_similarity: { type: DataTypes.FLOAT, defaultValue: 0.0 },
+    matched_incident_id: { type: DataTypes.UUID, allowNull: true },
+    incident_report_count: { type: DataTypes.INTEGER, defaultValue: 1 },
     // Numeric model input fields
     elevation_m: DataTypes.FLOAT,
     distance_to_river_m: DataTypes.FLOAT,
@@ -46,7 +63,6 @@ const Report = sequelize.define("Report", {
     infrastructure_score: DataTypes.FLOAT,
     nearest_hospital_km: DataTypes.FLOAT,
     nearest_evac_km: DataTypes.FLOAT,
-    incident_id: { type: DataTypes.UUID, allowNull: true },
 }, {
     tableName: "reports",
     timestamps: true,

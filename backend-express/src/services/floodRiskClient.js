@@ -51,9 +51,8 @@ export async function predictRoadDamage(fileBuffer, originalname, mimetype, cate
     const formData = new FormData();
     const blob = new Blob([fileBuffer], { type: mimetype || "image/jpeg" });
     formData.append("file", blob, originalname || "roaddamage.jpg");
-    formData.append("category", category || "pothole");
 
-    const response = await fetch(`${ML_SERVICE_URL}/predict-road-damage`, {
+    const response = await fetch(`${ML_SERVICE_URL}/analyze-road-damage`, {
       method: "POST",
       body: formData,
     });
@@ -79,5 +78,80 @@ export async function getRoadDamageModelStatus() {
     return data;
   } catch (err) {
     return { model_loaded: false, load_error: err.message };
+  }
+}
+
+/**
+ * Predicts priority/severity score for a complaint using the ML service.
+ */
+export async function predictPriority({
+  category,
+  raw_text,
+  specific_details,
+  district,
+  district_flood_risk,
+  has_photo,
+  image_analysis_score,
+}) {
+  try {
+    const { data } = await axios.post(
+      `${ML_SERVICE_URL}/predict-priority`,
+      {
+        category,
+        raw_text,
+        specific_details: specific_details || "",
+        district: district || "",
+        district_flood_risk: district_flood_risk || 0,
+        has_photo: !!has_photo,
+        image_analysis_score: image_analysis_score || 0,
+      },
+      { timeout: 6000 }
+    );
+    return data;
+  } catch (err) {
+    console.error("Priority prediction service error:", err.message);
+    return { error: "Could not reach AI priority service", detail: err.message };
+  }
+}
+
+/**
+ * Detects if a complaint is a duplicate of an existing incident.
+ */
+export async function detectDuplicate({
+  complaint_id,
+  category,
+  raw_text,
+  specific_details,
+  register = true,
+}) {
+  try {
+    const { data } = await axios.post(
+      `${ML_SERVICE_URL}/detect-duplicate`,
+      {
+        complaint_id,
+        category,
+        raw_text,
+        specific_details: specific_details || "",
+        register,
+      },
+      { timeout: 6000 }
+    );
+    return data;
+  } catch (err) {
+    console.error("Duplicate detection service error:", err.message);
+    return { error: "Could not reach AI duplicate service", detail: err.message };
+  }
+}
+
+/**
+ * Fetch all detected incidents (duplicate clusters).
+ */
+export async function fetchIncidents() {
+  try {
+    const { data } = await axios.get(`${ML_SERVICE_URL}/incidents`, { timeout: 3000 });
+    return data;
+  } catch (err) {
+    console.error("Incidents fetch error:", err.message);
+    return { incidents: [] };
   }
 }
