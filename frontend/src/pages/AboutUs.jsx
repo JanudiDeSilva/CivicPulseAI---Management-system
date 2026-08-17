@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useLang } from "../context/LanguageContext";
 import logoSvg from "../assets/logo.svg?raw";
 
 function LogoIcon({ className }) {
@@ -68,8 +69,10 @@ const CATEGORIES = [
 ];
 
 export default function About() {
+  const { t, lang } = useLang();
+
   return (
-    <main className="about-page">
+    <main className="about-page" lang={lang}>
       {/* =====================================================
           HERO
       ====================================================== */}
@@ -81,25 +84,23 @@ export default function About() {
             <LogoIcon className="about-logo" />
           </div>
 
-          <div className="about-eyebrow">Civic Intelligence Platform</div>
+          <div className="about-eyebrow">{t("about_eyebrow")}</div>
 
           <h1>
-            See the problem.
-            <span>Get it to the right desk.</span>
+            {t("about_hero_title_1")}
+            <span>{t("about_hero_title_2")}</span>
           </h1>
 
           <p className="about-lede">
-            CivicPulse AI turns a photo and a pin on the map into a
-            structured case file — categorized, located and routed to the
-            department that can actually act on it.
+            {t("about_lede")}
           </p>
 
           <div className="about-hero-buttons">
             <Link to="/complaint" className="about-btn about-btn-primary">
-              Report an issue <span aria-hidden="true">→</span>
+              {t("about_cta_report")} <span aria-hidden="true">→</span>
             </Link>
             <Link to="/dashboard" className="about-btn about-btn-secondary">
-              View dashboard
+              {t("about_cta_dashboard")}
             </Link>
           </div>
         </div>
@@ -110,27 +111,21 @@ export default function About() {
       ====================================================== */}
       <section className="about-intro">
         <div className="about-container">
-          <div className="about-eyebrow">About CivicPulse AI</div>
+          <div className="about-eyebrow">{t("about_eyebrow")}</div>
 
           <div className="about-intro-grid">
             <div>
               <h2>
-                Built for the space between <span>a citizen and city hall.</span>
+                {t("about_intro_heading")} <span>{t("about_intro_heading_2")}</span>
               </h2>
             </div>
 
             <div className="about-intro-text">
               <p>
-                CivicPulse AI is a civic-reporting platform that replaces
-                scattered phone calls and hallway complaints with a single,
-                searchable record. One photo, one location, one case number
-                per issue.
+                {t("about_intro_p1")}
               </p>
               <p>
-                Whether it's a pothole on the school run or a transformer
-                that's been sparking for a week, every report follows the
-                same path: submitted, located, reviewed, and handed to the
-                office responsible for fixing it.
+                {t("about_intro_p2")}
               </p>
             </div>
           </div>
@@ -143,13 +138,12 @@ export default function About() {
       <section className="about-features">
         <div className="about-container">
           <div className="about-section-heading">
-            <div className="about-eyebrow">What it does</div>
+            <div className="about-eyebrow">{t("about_eyebrow")}</div>
             <h2>
-              A structured way to <span>report and respond.</span>
+              <span>{t("about_features_heading")}</span>
             </h2>
             <p>
-              Four parts working together — reporting, triage, mapping and
-              dashboards — so a filed report doesn't just disappear.
+              {t("about_features_desc")}
             </p>
           </div>
 
@@ -174,17 +168,15 @@ export default function About() {
         <div className="about-container">
           <div className="categories-layout">
             <div className="categories-text">
-              <div className="about-eyebrow">Issue types</div>
+              <div className="about-eyebrow">{t("about_eyebrow")}</div>
               <h2>
-                One form for <span>every kind of problem.</span>
+                <span>{t("about_categories_title")}</span>
               </h2>
               <p>
-                Each category asks the questions relevant to that issue, so
-                the department on the other end gets what it actually needs
-                — not a generic complaint box.
+                {t("about_categories_desc")}
               </p>
               <Link to="/complaint" className="about-text-link">
-                Start a report →
+                {t("about_cta_report")} →
               </Link>
             </div>
 
@@ -211,16 +203,12 @@ export default function About() {
       ====================================================== */}
       <section className="about-mission">
         <div className="mission-card">
-          <div className="about-eyebrow">Why this exists</div>
+          <div className="about-eyebrow">{t("about_eyebrow")}</div>
           <h2>
-            Every report deserves <span>a paper trail.</span>
+            <span>{t("about_mission_title")}</span>
           </h2>
           <p>
-            Most civic complaints disappear into inboxes and phone logs with
-            no way to follow up later. CivicPulse AI gives every report a
-            case number, a location and a status, so citizens can see what
-            happened to what they filed, and departments have a record of
-            how they responded.
+            {t("about_mission_p")}
           </p>
         </div>
       </section>
@@ -231,16 +219,15 @@ export default function About() {
       <section className="about-final-cta">
         <div className="cta-card">
           <div>
-            <div className="about-eyebrow">Got something to report?</div>
-            <h2>Start with what you see.</h2>
+            <div className="about-eyebrow">{t("about_eyebrow")}</div>
+            <h2>{t("about_final_title")}</h2>
             <p>
-              A pothole, a broken light, a garbage pile that's been there for
-              weeks — if it affects your street, it belongs in the system.
+              {t("about_final_desc")}
             </p>
           </div>
 
           <Link to="/complaint" className="about-btn about-btn-primary">
-            Report an issue <span aria-hidden="true">→</span>
+            {t("about_cta_report")} <span aria-hidden="true">→</span>
           </Link>
         </div>
       </section>

@@ -36,7 +36,7 @@ router.get('/reports', async (_req, res) => {
         const reports = await Report.findAll({
             order: [['created_at', 'DESC']]
         });
-        res.json(reports);
+        res.json({ reports });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch reports', details: error.message });
     }
@@ -56,7 +56,10 @@ router.get('/reports/:id', async (req, res) => {
 });
 
 // Create new report with image upload
-router.post('/reports', upload.single('image'), async (req, res) => {
+router.post('/reports', upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'photo', maxCount: 1 }
+]), async (req, res) => {
     try {
         const { 
             name, 
@@ -72,7 +75,8 @@ router.post('/reports', upload.single('image'), async (req, res) => {
             severity_raw 
         } = req.body;
 
-        const imageUrl = req.file ? req.file.filename : null;
+        const uploadedFile = req.files?.image?.[0] || req.files?.photo?.[0] || null;
+        const imageUrl = uploadedFile ? `/uploads/${uploadedFile.filename}` : null;
 
         const report = await Report.create({
             name,
