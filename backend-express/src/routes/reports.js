@@ -1,9 +1,15 @@
-const express = require('express');
-const router = express.Router();
-const fs = require('fs');
-const path = require('path');
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { Report } from '../models/index.js';
 
-const uploadDir = 'uploads';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const router = express.Router();
+
+const uploadDir = path.join(__dirname, '../../uploads');
 
 // Existing routes...
 
@@ -11,12 +17,12 @@ const uploadDir = 'uploads';
 router.delete('/reports/:id', async (req, res) => {
     const complaintId = req.params.id;
     try {
-        const complaint = await Report.findByIdAndDelete(complaintId);
+        const complaint = await Report.findByPk(complaintId);
         if (!complaint) {
             return res.status(404).send('Complaint not found');
         }
 
-        const imageFilename = complaint.image;
+        const imageFilename = complaint.image_url;
         if (imageFilename) {
             const filepath = path.join(uploadDir, imageFilename);
             if (fs.existsSync(filepath)) {
@@ -24,12 +30,12 @@ router.delete('/reports/:id', async (req, res) => {
             }
         }
 
+        await complaint.destroy();
         res.send('Complaint deleted');
     } catch (error) {
         res.status(500).send('Server error');
     }
 });
-======= 
 
 // Serve images
 router.get('/images/:filename', (req, res) => {
@@ -43,4 +49,4 @@ router.get('/images/:filename', (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;
