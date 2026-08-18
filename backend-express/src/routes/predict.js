@@ -27,10 +27,7 @@ const upload = multer({
 });
 
 // Main prediction endpoint that processes complaints
-router.post('/predict', upload.fields([
-  { name: 'image', maxCount: 1 },
-  { name: 'photo', maxCount: 1 }
-]), async (req, res) => {
+router.post('/predict', upload.array('photos', 10), async (req, res) => {
   try {
     const { 
       category, 
@@ -48,18 +45,20 @@ router.post('/predict', upload.fields([
       status
     } = req.body;
 
-    const uploadedFile = req.files?.image?.[0] || req.files?.photo?.[0] || null;
+    const uploadedFiles = req.files || [];
+    const firstFile = uploadedFiles.length > 0 ? uploadedFiles[0] : null;
     const finalRawText = raw_text || description || specific_details || '';
 
-    let savedImageUrl = null;
-    let savedFileName = null;
+    let savedImageUrls = [];
 
-    if (uploadedFile) {
-      const ext = path.extname(uploadedFile.originalname || '.jpg') || '.jpg';
-      savedFileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-      const filePath = path.join(uploadDir, savedFileName);
-      fs.writeFileSync(filePath, uploadedFile.buffer);
-      savedImageUrl = `/uploads/${savedFileName}`;
+    if (uploadedFiles.length > 0) {
+      for (const file of uploadedFiles) {
+        const ext = path.extname(file.originalname || '.jpg') || '.jpg';
+        const savedFileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const filePath = path.join(uploadDir, savedFileName);
+        fs.writeFileSync(filePath, file.buffer);
+        savedImageUrls.push(`/uploads/${savedFileName}`);
+      }
     }
 
     // Basic triage
@@ -87,19 +86,19 @@ router.post('/predict', upload.fields([
     }
 
     // Run AI image analysis if image is provided
-    if (uploadedFile && (category === 'garbage' || category === 'road_damage')) {
+    if (firstFile && (category === 'garbage' || category === 'road_damage')) {
       try {
         if (category === 'garbage') {
           aiAnalysis = await predictGarbage(
-            uploadedFile.buffer,
-            uploadedFile.originalname,
-            uploadedFile.mimetype
+            firstFile.buffer,
+            firstFile.originalname,
+            firstFile.mimetype
           );
         } else if (category === 'road_damage') {
           aiAnalysis = await predictRoadDamage(
-            uploadedFile.buffer,
-            uploadedFile.originalname,
-            uploadedFile.mimetype,
+            firstFile.buffer,
+            firstFile.originalname,
+            firstFile.mimetype,
             category
           );
         }
@@ -179,7 +178,7 @@ router.post('/predict', upload.fields([
     enhancedTriage.severity = aiSeverity;
     enhancedTriage.priorityScore = aiPriorityScore;
 
-    const finalImageUrl = savedImageUrl || null;
+    const finalImageUrl = savedImageUrls.length > 0 ? JSON.stringify(savedImageUrls) : null;
     const mlAnalysisPayload = aiAnalysis
       ? { type: category === 'garbage' ? 'garbage' : category === 'road_damage' ? 'road_damage' : 'flood', ...aiAnalysis }
       : floodRisk

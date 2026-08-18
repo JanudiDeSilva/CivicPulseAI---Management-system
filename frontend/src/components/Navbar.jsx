@@ -133,6 +133,17 @@ export default function Navbar() {
             >
               සි
             </button>
+
+            <button
+              id="lang-ta-btn"
+              onClick={() => switchLang("ta")}
+              className={`ctrl-btn${
+                lang === "ta" ? " active" : ""
+              }`}
+              title="தமிழுக்கு மாறுங்கள்"
+            >
+              த
+            </button>
           </div>
 
           {/* Divider */}

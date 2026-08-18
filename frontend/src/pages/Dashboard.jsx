@@ -1,13 +1,44 @@
 import { useState, useEffect, useCallback } from "react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { fetchReports, fetchStats, updateReportStatus, updateReportReply } from "../services/api";
 import MapView from "../components/MapView";
 
 const CATEGORY_META = {
-  flood: { title: "Flood & Drainage", icon: "🌊", color: "#3b82f6", badge: "badge-flood" },
-  road_damage: { title: "Road Damages", icon: "🚗", color: "#f59e0b", badge: "badge-road_damage" },
-  garbage: { title: "Garbage & Waste", icon: "🗑️", color: "#10b981", badge: "badge-garbage" },
-  power_failure: { title: "Power Outages", icon: "⚡", color: "#8b5cf6", badge: "badge-power_failure" },
-  street_light: { title: "Street Lights", icon: "💡", color: "#eab308", badge: "badge-street_light" },
+  garbage: {
+    title: "Garbage & Waste",
+    icon: "🗑️",
+    color: "#10b981",
+    badge: "badge-garbage",
+  },
+
+  road_damage: {
+    title: "Road Damages",
+    icon: "🚗",
+    color: "#f59e0b",
+    badge: "badge-road_damage",
+  },
+
+  power_failure: {
+    title: "Power Outages",
+    icon: "⚡",
+    color: "#8b5cf6",
+    badge: "badge-power_failure",
+  },
+
+  street_light: {
+    title: "Street Lights",
+    icon: "💡",
+    color: "#eab308",
+    badge: "badge-street_light",
+  },
+
+  flood: {
+    title: "Flood & Drainage",
+    icon: "🌊",
+    color: "#3b82f6",
+    badge: "badge-flood",
+  },
 };
 
 const STATUS_OPTIONS = ["All", "Registered", "Under Review", "Dispatched", "Resolved"];
@@ -78,6 +109,7 @@ export default function Dashboard() {
   const [replySuccess, setReplySuccess] = useState(null);
   const [expandedFlood, setExpandedFlood] = useState(null);
   const [expandedLogId, setExpandedLogId] = useState(null);
+  const [exportFormat, setExportFormat] = useState("csv");
 
   const loadData = useCallback(async () => {
     try {
@@ -204,6 +236,72 @@ export default function Dashboard() {
     }
   };
 
+  const exportToCSV = () => {
+    if (!filteredComplaints.length) return;
+    
+    const headers = ["ID", "Citizen Name", "Phone", "Category", "Location", "Severity", "Priority Score", "Status", "Submitted At"];
+    const csvContent = [
+      headers.join(","),
+      ...filteredComplaints.map(c => [
+        c.tracking_id || c.id,
+        `"${(c.name || "").replace(/"/g, '""')}"`,
+        `"${(c.phone || "").replace(/"/g, '""')}"`,
+        c.category,
+        `"${[c.area, c.city, c.district].filter(Boolean).join(", ")}"`,
+        resolveAiSeverity(c),
+        resolvePriorityScore(c),
+        c.status,
+        `"${c.submitted_at || ""}"`
+      ].join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `complaints_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToPDF = () => {
+    if (!filteredComplaints.length) return;
+    
+    const doc = new jsPDF();
+    doc.text("CivicPulse AI Complaints Report", 14, 15);
+    
+    const headers = [["ID", "Citizen Name", "Category", "Location", "Severity", "Status"]];
+    const data = filteredComplaints.map(c => [
+      c.tracking_id || c.id,
+      c.name || "N/A",
+      c.category,
+      [c.area, c.city, c.district].filter(Boolean).join(", "),
+      resolveAiSeverity(c),
+      c.status
+    ]);
+
+    doc.autoTable({
+      head: headers,
+      body: data,
+      startY: 20,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [15, 23, 42] }
+    });
+
+    doc.save(`complaints_report_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const handleExport = () => {
+    if (exportFormat === "csv") {
+      exportToCSV();
+    } else {
+      exportToPDF();
+    }
+  };
+
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", textAlign: "left" }}>
 
@@ -241,6 +339,25 @@ export default function Dashboard() {
           >
             ↻ Refresh
           </button>
+          
+          <div style={{ display: "flex", alignItems: "center", marginLeft: 4 }}>
+            <select
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value)}
+              className="form-input"
+              style={{ fontSize: "0.82rem", padding: "8px 12px", width: "auto", borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRight: 0 }}
+            >
+              <option value="csv">CSV</option>
+              <option value="pdf">PDF</option>
+            </select>
+            <button
+              onClick={handleExport}
+              className="btn btn-secondary"
+              style={{ fontSize: "0.82rem", padding: "10px 16px", alignSelf: "center", borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
+            >
+              📥 Export
+            </button>
+          </div>
         </div>
       </div>
 
@@ -575,15 +692,23 @@ export default function Dashboard() {
         const mlData = typeof rawMlData === "string" ? (() => { try { return JSON.parse(rawMlData); } catch { return {}; } })() : rawMlData;
         const descriptionText = item.raw_text ?? item.description ?? item.specific_details ?? "No user description provided.";
         const summaryText = descriptionText || "No user description provided.";
-        const imageUrl = item.image_url
-          ? item.image_url.startsWith("http")
-            ? item.image_url
-            : `http://127.0.0.1:8000${item.image_url.startsWith("/") ? item.image_url : `/${item.image_url}`}`
-          : item.photo_url
-            ? item.photo_url.startsWith("http")
-              ? item.photo_url
-              : `http://127.0.0.1:8000${item.photo_url.startsWith("/") ? item.photo_url : `/${item.photo_url}`}`
-            : null;
+        
+        let imageList = [];
+        try {
+          if (item.image_url && item.image_url.startsWith("[")) {
+            imageList = JSON.parse(item.image_url);
+          } else if (item.image_url) {
+            imageList = [item.image_url];
+          } else if (item.photo_url) {
+            imageList = [item.photo_url];
+          }
+        } catch (e) {
+          if (item.image_url) imageList = [item.image_url];
+        }
+
+        const formattedImages = imageList.map(url => 
+          url.startsWith("http") ? url : `http://127.0.0.1:8000${url.startsWith("/") ? url : `/${url}`}`
+        );
 
         return (
           <div className="glass-card" style={{ marginTop: 20, padding: 20 }}>
@@ -621,11 +746,15 @@ export default function Dashboard() {
               </div>
 
               <div style={{ background: "rgba(15,23,42,0.75)", border: "1px solid #334155", borderRadius: 12, padding: 16 }}>
-                <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 10 }}>Uploaded image</div>
-                {imageUrl ? (
-                  <img src={imageUrl} alt="Complaint upload" style={{ width: "100%", maxWidth: 320, height: 220, objectFit: "cover", borderRadius: 10, border: "1px solid #475569" }} />
+                <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 10 }}>Uploaded image(s)</div>
+                {formattedImages.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                    {formattedImages.map((src, idx) => (
+                      <img key={idx} src={src} alt={`Complaint upload ${idx + 1}`} style={{ width: "100%", maxWidth: 320, height: 220, objectFit: "cover", borderRadius: 10, border: "1px solid #475569" }} />
+                    ))}
+                  </div>
                 ) : (
-                  <div style={{ color: "#64748b" }}>No uploaded image</div>
+                  <div style={{ color: "#64748b" }}>No uploaded images</div>
                 )}
               </div>
             </div>

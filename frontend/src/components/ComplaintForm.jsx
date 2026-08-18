@@ -121,8 +121,8 @@ export default function ComplaintForm() {
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState("");
  
-  const [photo, setPhoto] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photos, setPhotos] = useState([]);
+  const [photoPreviews, setPhotoPreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(null);
   const [countdown, setCountdown] = useState(5);
@@ -321,14 +321,20 @@ export default function ComplaintForm() {
   // --- END ADDED ---
  
   const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setPhoto(file);
-      setPhotoPreview(URL.createObjectURL(file));
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      const allowedFiles = files.slice(0, 10 - photos.length);
+      if (allowedFiles.length === 0) return;
+
+      const newPhotos = [...photos, ...allowedFiles];
+      const newPreviews = [...photoPreviews, ...allowedFiles.map(file => URL.createObjectURL(file))];
+      
+      setPhotos(newPhotos);
+      setPhotoPreviews(newPreviews);
  
       // --- ADDED: auto-run AI garbage classification, only for the Garbage category ---
-      if (form.category === "garbage") {
-        classifyGarbagePhoto(file);
+      if (form.category === "garbage" && newPhotos.length > 0) {
+        classifyGarbagePhoto(newPhotos[0]);
       } else {
         setGarbageResult(null);
         setGarbageError(null);
@@ -337,18 +343,28 @@ export default function ComplaintForm() {
     }
   };
 
-  const handleDetachPhoto = (e) => {
+  const handleDetachPhoto = (index, e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    setPhoto(null);
-    setPhotoPreview(null);
-    setGarbageResult(null);
-    setGarbageError(null);
-    const fileInput = document.getElementById("photo-upload-input");
-    if (fileInput) {
-      fileInput.value = "";
+    const newPhotos = [...photos];
+    const newPreviews = [...photoPreviews];
+    newPhotos.splice(index, 1);
+    newPreviews.splice(index, 1);
+    
+    setPhotos(newPhotos);
+    setPhotoPreviews(newPreviews);
+    
+    if (newPhotos.length === 0) {
+      setGarbageResult(null);
+      setGarbageError(null);
+      const fileInput = document.getElementById("photo-upload-input");
+      if (fileInput) {
+        fileInput.value = "";
+      }
+    } else if (form.category === "garbage" && index === 0) {
+      classifyGarbagePhoto(newPhotos[0]);
     }
   };
  
@@ -370,8 +386,10 @@ export default function ComplaintForm() {
       data.append("longitude", location.longitude);
     }
  
-    if (photo) {
-      data.append("photo", photo);
+    if (photos.length > 0) {
+      photos.forEach(p => {
+        data.append("photos", p);
+      });
     }
  
     // Persist ticket details to localStorage for Admin Dashboard
@@ -425,7 +443,7 @@ export default function ComplaintForm() {
                 tracking_id: serverData.tracking_id || trackingId,
                 severity: serverData.severity || "PENDING",
                 status: serverData.status || "Registered",
-                image_url: serverData.image_url || photoPreview || c.image_url,
+                image_url: serverData.image_url || (photoPreviews.length > 0 ? JSON.stringify(photoPreviews) : null) || c.image_url,
                 ml_analysis: serverData.ml_analysis || garbageResult || c.ml_analysis,
               }
             : c
@@ -487,7 +505,7 @@ export default function ComplaintForm() {
                 ...c,
                 severity: demoSeverity,
                 status: demoStatus,
-                image_url: photoPreview || null,
+                image_url: photoPreviews.length > 0 ? JSON.stringify(photoPreviews) : null,
                 ml_analysis: demoMlAnalysis || garbageResult || null,
                 priority_score: demoPriorityScore,
                 predicted_escalation: demoPredictedEscalation
@@ -1246,56 +1264,56 @@ export default function ComplaintForm() {
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handlePhotoChange}
                 style={{ display: "none" }}
                 id="photo-upload-input"
               />
               <label htmlFor="photo-upload-input" style={{ cursor: "pointer", display: "block" }}>
-                {photoPreview ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, width: "100%", maxWidth: 450, margin: "0 auto" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <img
-                        src={photoPreview}
-                        alt="Preview"
-                        style={{ width: 50, height: 50, borderRadius: 8, objectFit: "cover", border: "1px solid #475569" }}
-                      />
-                      <div style={{ textAlign: "left" }}>
-                        <p style={{ fontWeight: 600, color: "#f8fafc", margin: 0, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{photo?.name || "Image file"}</p>
-                        <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: 0 }}>
-                          {photo ? `${(photo.size / 1024).toFixed(1)} KB • ` : ""}Click to change photo
-                        </p>
+                {photoPreviews.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 450, margin: "0 auto" }}>
+                    {photoPreviews.map((preview, index) => (
+                      <div key={index} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          <img
+                            src={preview}
+                            alt={`Preview ${index + 1}`}
+                            style={{ width: 50, height: 50, borderRadius: 8, objectFit: "cover", border: "1px solid #475569" }}
+                          />
+                          <div style={{ textAlign: "left" }}>
+                            <p style={{ fontWeight: 600, color: "#f8fafc", margin: 0, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{photos[index]?.name || "Image file"}</p>
+                            <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: 0 }}>
+                              {photos[index] ? `${(photos[index].size / 1024).toFixed(1)} KB` : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDetachPhoto(index, e)}
+                          style={{
+                            background: "rgba(239, 68, 68, 0.2)",
+                            color: "#f87171",
+                            border: "1px solid rgba(239, 68, 68, 0.4)",
+                            borderRadius: 8,
+                            padding: "6px 12px",
+                            fontSize: "0.78rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                          }}
+                        >
+                          ✕ Detach
+                        </button>
                       </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleDetachPhoto}
-                      style={{
-                        background: "rgba(239, 68, 68, 0.2)",
-                        color: "#f87171",
-                        border: "1px solid rgba(239, 68, 68, 0.4)",
-                        borderRadius: 8,
-                        padding: "6px 12px",
-                        fontSize: "0.78rem",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "all 0.2s"
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = "rgba(239, 68, 68, 0.35)";
-                        e.target.style.color = "#fca5a5";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = "rgba(239, 68, 68, 0.2)";
-                        e.target.style.color = "#f87171";
-                      }}
-                    >
-                      ✕ Detach
-                    </button>
+                    ))}
+                    {photoPreviews.length < 10 && (
+                      <div style={{ color: "#60a5fa", fontSize: "0.85rem", marginTop: 8 }}>+ Add another photo ({10 - photoPreviews.length} remaining)</div>
+                    )}
                   </div>
                 ) : (
                   <div>
                     <div style={{ fontSize: 24, marginBottom: 4 }}>📸</div>
-                    <p style={{ color: "#f8fafc", fontWeight: 600, margin: 0 }}>Click to attach an image file</p>
+                    <p style={{ color: "#f8fafc", fontWeight: 600, margin: 0 }}>Click to attach up to 10 image files</p>
                     <p style={{ fontSize: "0.8rem", color: "#64748b", margin: 0 }}>PNG, JPG, or WEBP up to 10MB</p>
                   </div>
                 )}

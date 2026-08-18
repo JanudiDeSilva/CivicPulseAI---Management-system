@@ -15,7 +15,7 @@ const Report = sequelize.define("Report", {
 
     raw_text: DataTypes.TEXT,
     specific_details: DataTypes.TEXT,
-    image_url: DataTypes.STRING,
+    image_url: DataTypes.TEXT,
     ml_analysis: DataTypes.JSON,
     risk_signals: DataTypes.JSON,
 
