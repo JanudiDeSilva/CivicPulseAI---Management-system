@@ -19,8 +19,8 @@ const CATEGORIES = [
     titleKey: "cat_flood",
     icon: "🌊",
     image: floodImg,
-    desc_en: "Report flash flooding, overflowing canals, and clogged drainage systems.",
-    desc_si: "ආකස්මික ගංවතුර, ඉදිරිකරණ ඇළ ගලා යාම සහ අවහිර ජල කාණු පද්ධති වාර්තා කරන්න.",
+    desc_en: "Report urban waterlogging, overflowing canals, and clogged storm drainage systems.",
+    desc_si: "නාගරික ජල බැසීමේ ගැටළු, ඇළ මාර්ග පිරී යාම සහ අවහිර කාණු පද්ධති වාර්තා කරන්න.",
     badge: "badge-flood",
   },
   {
