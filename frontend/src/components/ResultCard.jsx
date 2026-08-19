@@ -2,7 +2,7 @@ export default function ResultCard({ result }) {
   if (!result) return null;
 
   const categoryMap = {
-    flood: { icon: "🌊", label: "Flood & Drainage", badge: "badge-flood", color: "#3b82f6" },
+    flood: { icon: "🌊", label: "Drainage & Waterlogging", badge: "badge-flood", color: "#3b82f6" },
     road_damage: { icon: "🚗", label: "Road Damage", badge: "badge-road_damage", color: "#f59e0b" },
     garbage: { icon: "🗑️", label: "Garbage & Waste", badge: "badge-garbage", color: "#10b981" },
     power_failure: { icon: "⚡", label: "Power Failure", badge: "badge-power_failure", color: "#8b5cf6" },
@@ -13,7 +13,7 @@ export default function ResultCard({ result }) {
   const categoryInfo = categoryMap[catKey] || categoryMap.flood;
 
   const severityClass = 
-    result.severity?.toLowerCase() === "critical" || result.severity?.toLowerCase() === "high" || result.flood_risk?.toLowerCase() === "high"
+    result.severity?.toLowerCase() === "critical" || result.severity?.toLowerCase() === "high" || result.drainage_risk?.toLowerCase() === "high" || result.flood_risk?.toLowerCase() === "high"
       ? "severity-high"
       : result.severity?.toLowerCase() === "medium"
       ? "severity-medium"

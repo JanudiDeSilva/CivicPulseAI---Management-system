@@ -71,14 +71,33 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
     let aiAnalysis = null;
     let floodRisk = null;
 
-    // Get flood risk for flood-related complaints
-    if (category === 'flood' && district) {
+    // Get drainage & waterlogging triage assessment for flood/drainage complaints
+    if (category === 'flood') {
       try {
+        let parsedImpact = [];
+        if (req.body.impact) {
+          if (Array.isArray(req.body.impact)) {
+            parsedImpact = req.body.impact;
+          } else {
+            try {
+              parsedImpact = JSON.parse(req.body.impact);
+            } catch (_) {
+              parsedImpact = [req.body.impact];
+            }
+          }
+        }
+
         floodRisk = await getFloodRiskFromComplaint({
           district,
           place_name: area || city,
           latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null
+          longitude: longitude ? parseFloat(longitude) : null,
+          problem_type: req.body.problemType || req.body.problem_type || '',
+          severity_waterlogging: req.body.severityWaterlogging || req.body.severity_waterlogging || '',
+          water_status: req.body.waterStatus || req.body.water_status || '',
+          duration: req.body.problemDuration || req.body.duration || '',
+          impact: parsedImpact,
+          description: finalRawText
         });
       } catch (error) {
         console.warn('Flood risk prediction failed:', error.message);
@@ -157,26 +176,34 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
       return fallback;
     };
 
-    if (floodRisk && floodRisk.risk_level) {
-      aiSeverity = String(floodRisk.risk_level).toUpperCase();
-      aiPriorityScore = Math.max(aiPriorityScore, Number((floodRisk.flood_probability ?? 0.7).toFixed(2)));
-    }
+    if (category === 'flood' && floodRisk) {
+      aiSeverity = floodRisk.severity || 'LOW';
+      aiPriorityScore = Number(((floodRisk.priority_score || 50) / 100).toFixed(2));
+      enhancedTriage.predictedEscalation = (floodRisk.escalation_flag === 'Yes' || floodRisk.escalation_flag === 'YES') ? 'YES' : 'NO';
+      enhancedTriage.severity = aiSeverity;
+      enhancedTriage.priorityScore = aiPriorityScore;
+    } else {
+      if (floodRisk && floodRisk.risk_level) {
+        aiSeverity = String(floodRisk.risk_level).toUpperCase();
+        aiPriorityScore = Math.max(aiPriorityScore, Number((floodRisk.flood_probability ?? 0.7).toFixed(2)));
+      }
 
-    if (aiAnalysis && !aiAnalysis.error) {
-      const modelSeverity = deriveModelSeverity(aiAnalysis, aiSeverity);
-      const modelPriority = deriveModelPriority(aiAnalysis, aiPriorityScore);
-      aiSeverity = modelSeverity;
-      aiPriorityScore = modelPriority;
-    }
+      if (aiAnalysis && !aiAnalysis.error) {
+        const modelSeverity = deriveModelSeverity(aiAnalysis, aiSeverity);
+        const modelPriority = deriveModelPriority(aiAnalysis, aiPriorityScore);
+        aiSeverity = modelSeverity;
+        aiPriorityScore = modelPriority;
+      }
 
-    if (floodRisk && floodRisk.risk_level === 'HIGH') {
-      aiSeverity = 'CRITICAL';
-      aiPriorityScore = 0.95;
-      enhancedTriage.predictedEscalation = 'YES';
-    }
+      if (floodRisk && floodRisk.risk_level === 'HIGH') {
+        aiSeverity = 'CRITICAL';
+        aiPriorityScore = 0.95;
+        enhancedTriage.predictedEscalation = 'YES';
+      }
 
-    enhancedTriage.severity = aiSeverity;
-    enhancedTriage.priorityScore = aiPriorityScore;
+      enhancedTriage.severity = aiSeverity;
+      enhancedTriage.priorityScore = aiPriorityScore;
+    }
 
     const finalImageUrl = savedImageUrls.length > 0 ? JSON.stringify(savedImageUrls) : null;
     const mlAnalysisPayload = aiAnalysis

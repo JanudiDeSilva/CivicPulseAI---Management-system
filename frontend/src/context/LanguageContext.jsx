@@ -29,8 +29,7 @@ export const translations = {
     home_stats_resolved: "Issues Resolved",
     home_stats_districts: "Districts Covered",
 
-    // Category labels
-    cat_flood: "Flood & Drainage",
+    cat_flood: "Drainage & Waterlogging",
     cat_road: "Road Damage",
     cat_garbage: "Garbage & Waste",
     cat_power: "Power Failure",
@@ -145,7 +144,7 @@ export const translations = {
     home_stats_districts: "ආවරණය වූ දිස්ත්‍රික්ක",
 
     // Category labels
-    cat_flood: "ගංවතුර සහ ජල බැස්සීම",
+    cat_flood: "කාණු සහ ජල බැසීමේ ගැටළු",
     cat_road: "මාර්ග හානි",
     cat_garbage: "කසළ සහ අපද්‍රව්‍ය",
     cat_power: "විදුලි බිඳ වැටීම",
@@ -260,7 +259,7 @@ export const translations = {
     home_stats_districts: "உள்ளடக்கப்பட்ட மாவட்டங்கள்",
 
     // Category labels
-    cat_flood: "வெள்ளம் மற்றும் வடிகால்",
+    cat_flood: "வடிகால் மற்றும் நீர் தேக்கம்",
     cat_road: "சாலை சேதம்",
     cat_garbage: "குப்பை மற்றும் கழிவு",
     cat_power: "மின்சாரம் நிறுத்தம்",

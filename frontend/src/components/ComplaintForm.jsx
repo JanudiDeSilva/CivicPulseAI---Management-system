@@ -12,14 +12,14 @@ import streetLightImg from "../assets/light.jpeg";
 const ISSUE_CATEGORIES = [
   {
     id: "flood",
-    label: "Flood & Drainage Issue",
+    label: "Drainage & Waterlogging Issue",
     icon: "🌊",
     image: floodImg,
     color: "#2563eb",
     bg: "rgba(37, 99, 235, 0.12)",
     border: "rgba(59, 130, 246, 0.4)",
     badgeClass: "badge-flood",
-    description: "Waterlogging, river overflow, blocked storm drains, or flash flood risk"
+    description: "Blocked storm drains, waterlogging on roads, overflowing canals, broken drain covers, or stagnant water issues"
   },
   {
     id: "road_damage",
@@ -90,10 +90,16 @@ export default function ComplaintForm() {
 
   const [categoryDetails, setCategoryDetails] = useState({
     // Flood
-    floodDepth: "Knee Deep (1 - 2 ft)",
-    drainageStatus: "Blocked Storm Drain / Drain Grate",
-    affectedImpact: "Residential Houses & Yard Areas",
-    waterEntering: "Yes - Ground Floor Inundated",
+    problemType: "Blocked / Clogged Storm Drain or Grate",
+    severityWaterlogging: "Minor – Ankle deep or less",
+    waterStatus: "Flowing",
+    problemDuration: "Just started (today)",
+    flood_impact_traffic: false,
+    flood_impact_pedestrian: false,
+    flood_impact_entering: false,
+    flood_impact_smell: false,
+    flood_impact_mosquito: false,
+    flood_impact_vehicle: false,
 
     // Garbage
     wasteType: "Household Organic & Food Waste",
@@ -123,6 +129,11 @@ export default function ComplaintForm() {
   const [location, setLocation] = useState(null);
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState("");
+
+  const handleCheckboxChange = (e) => {
+    const { name, checked } = e.target;
+    setCategoryDetails((prev) => ({ ...prev, [name]: checked }));
+  };
 
   const [photos, setPhotos] = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -174,8 +185,16 @@ export default function ComplaintForm() {
 
   const getCategorySpecificSummary = () => {
     switch (form.category) {
-      case "flood":
-        return `Depth: ${categoryDetails.floodDepth} | Cause: ${categoryDetails.drainageStatus} | Zone: ${categoryDetails.affectedImpact} | Water in Houses: ${categoryDetails.waterEntering}`;
+      case "flood": {
+        const impacts = [];
+        if (categoryDetails.flood_impact_traffic) impacts.push("Traffic disruption");
+        if (categoryDetails.flood_impact_pedestrian) impacts.push("Pedestrian difficulty");
+        if (categoryDetails.flood_impact_entering) impacts.push("Water entering houses/shops");
+        if (categoryDetails.flood_impact_smell) impacts.push("Foul smell");
+        if (categoryDetails.flood_impact_mosquito) impacts.push("Mosquito breeding risk");
+        if (categoryDetails.flood_impact_vehicle) impacts.push("Vehicle damage risk");
+        return `Problem: ${categoryDetails.problemType} | Severity: ${categoryDetails.severityWaterlogging} | Status: ${categoryDetails.waterStatus} | Duration: ${categoryDetails.problemDuration} | Impact: ${impacts.join(", ") || "None"}`;
+      }
       case "garbage":
         return `Condition: ${categoryDetails.dumpsterStatus} | Duration: ${categoryDetails.accumulationDuration} | Hazard: ${categoryDetails.healthHazard}`;
       case "road_damage":
@@ -368,6 +387,22 @@ export default function ComplaintForm() {
     data.append("tracking_id", trackingId);
     data.append("specific_details", specificSummary);
 
+    if (form.category === "flood") {
+      data.append("problemType", categoryDetails.problemType || '');
+      data.append("severityWaterlogging", categoryDetails.severityWaterlogging || '');
+      data.append("waterStatus", categoryDetails.waterStatus || '');
+      data.append("problemDuration", categoryDetails.problemDuration || '');
+      
+      const impacts = [];
+      if (categoryDetails.flood_impact_traffic) impacts.push("Traffic disruption");
+      if (categoryDetails.flood_impact_pedestrian) impacts.push("Pedestrian difficulty");
+      if (categoryDetails.flood_impact_entering) impacts.push("Water entering houses/shops");
+      if (categoryDetails.flood_impact_smell) impacts.push("Foul smell");
+      if (categoryDetails.flood_impact_mosquito) impacts.push("Mosquito breeding risk");
+      if (categoryDetails.flood_impact_vehicle) impacts.push("Vehicle damage risk");
+      data.append("impact", JSON.stringify(impacts));
+    }
+
     if (location) {
       data.append("latitude", location.latitude);
       data.append("longitude", location.longitude);
@@ -443,6 +478,7 @@ export default function ComplaintForm() {
         priorityScore: serverData.priority_score,
         predictedEscalation: serverData.predicted_escalation,
         mlAnalysis: serverData.ml_analysis,
+        floodRisk: serverData.floodRisk || null,
         status: serverData.status || "Registered",
         categoryLabel: currentCategory.label,
         categoryIcon: currentCategory.icon,
@@ -786,27 +822,101 @@ export default function ComplaintForm() {
                 </h3>
               </div>
 
-              {/* FLOOD SPECIFIC FIELDS */}
+              {/* FLOOD / DRAINAGE SPECIFIC FIELDS */}
               {form.category === "flood" && (
-                <div className="grid-2">
-                  <div className="form-group" style={{ marginBottom: 10 }}>
-                    <label className="form-label">Water Depth / Flood Level</label>
-                    <select name="floodDepth" value={categoryDetails.floodDepth} onChange={handleDetailChange} className="form-select">
-                      <option value="Ankle Deep (< 1 ft)">Ankle Deep (&lt; 1 ft) — Minor</option>
-                      <option value="Knee Deep (1 - 2 ft)">Knee Deep (1 - 2 ft) — Moderate</option>
-                      <option value="Waist Deep (2 - 4 ft)">Waist Deep (2 - 4 ft) — Severe</option>
-                      <option value="Critical Inundation (> 4 ft)">Critical Inundation (&gt; 4 ft)</option>
-                    </select>
+                <div>
+                  {/* Row 1 */}
+                  <div className="grid-2">
+                    <div className="form-group" style={{ marginBottom: 14 }}>
+                      <label className="form-label">
+                        Type of Problem <span style={{ color: "#ef4444" }}>*</span>
+                      </label>
+                      <select name="problemType" value={categoryDetails.problemType} onChange={handleDetailChange} className="form-select">
+                        <option value="Blocked / Clogged Storm Drain or Grate">Blocked / Clogged Storm Drain or Grate</option>
+                        <option value="Overflowing Canal or Open Drain">Overflowing Canal or Open Drain</option>
+                        <option value="Waterlogging on Road / Street">Waterlogging on Road / Street</option>
+                        <option value="Broken, Missing or Open Drain Cover">Broken, Missing or Open Drain Cover</option>
+                        <option value="Collapsed or Damaged Culvert / Pipe">Collapsed or Damaged Culvert / Pipe</option>
+                        <option value="Inadequate Drainage Capacity">Inadequate Drainage Capacity</option>
+                        <option value="Stagnant Water (health risk)">Stagnant Water (health risk)</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 14 }}>
+                      <label className="form-label">Severity of Waterlogging</label>
+                      <select name="severityWaterlogging" value={categoryDetails.severityWaterlogging} onChange={handleDetailChange} className="form-select">
+                        <option value="Minor – Ankle deep or less">Minor – Ankle deep or less</option>
+                        <option value="Moderate – Knee deep">Moderate – Knee deep</option>
+                        <option value="Severe – Above knee / vehicles affected">Severe – Above knee / vehicles affected</option>
+                        <option value="Extreme – Water entering buildings">Extreme – Water entering buildings</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <div className="form-group" style={{ marginBottom: 10 }}>
-                    <label className="form-label">Drainage / Canal Status</label>
-                    <select name="drainageStatus" value={categoryDetails.drainageStatus} onChange={handleDetailChange} className="form-select">
-                      <option value="Blocked Storm Drain / Drain Grate">Blocked Storm Drain / Drain Grate</option>
-                      <option value="Overflowing Canal / River Bank">Overflowing Canal / River Bank</option>
-                      <option value="Inadequate Drainage Capacity">Inadequate Drainage Capacity</option>
-                      <option value="Broken Culvert / Sluice Gate">Broken Culvert / Sluice Gate</option>
-                    </select>
+                  {/* Row 2 */}
+                  <div className="grid-2">
+                    <div className="form-group" style={{ marginBottom: 14 }}>
+                      <label className="form-label">Is the water flowing or stagnant?</label>
+                      <select name="waterStatus" value={categoryDetails.waterStatus} onChange={handleDetailChange} className="form-select">
+                        <option value="Flowing">Flowing</option>
+                        <option value="Stagnant">Stagnant</option>
+                        <option value="Both">Both</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 14 }}>
+                      <label className="form-label">Duration of the Problem</label>
+                      <select name="problemDuration" value={categoryDetails.problemDuration} onChange={handleDetailChange} className="form-select">
+                        <option value="Just started (today)">Just started (today)</option>
+                        <option value="1–2 days">1–2 days</option>
+                        <option value="Several days">Several days</option>
+                        <option value="Recurring problem">Recurring problem</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Impact Checkboxes */}
+                  <div className="form-group" style={{ marginBottom: 14 }}>
+                    <label className="form-label">Impact <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: "0.85rem" }}>(select all that apply)</span></label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 20px", marginTop: 8 }}>
+                      {[
+                        { name: "flood_impact_traffic", label: "🚗 Traffic disruption" },
+                        { name: "flood_impact_pedestrian", label: "🚶 Pedestrian difficulty" },
+                        { name: "flood_impact_entering", label: "🏠 Water entering houses/shops" },
+                        { name: "flood_impact_smell", label: "🤢 Foul smell" },
+                        { name: "flood_impact_mosquito", label: "🦟 Mosquito breeding risk" },
+                        { name: "flood_impact_vehicle", label: "⚠️ Vehicle damage risk" },
+                      ].map(({ name, label }) => (
+                        <label key={name} style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: "0.9rem", color: "var(--text-main)" }}>
+                          <input
+                            type="checkbox"
+                            name={name}
+                            checked={!!categoryDetails[name]}
+                            onChange={handleCheckboxChange}
+                            style={{ width: 16, height: 16, accentColor: "#3b82f6", cursor: "pointer" }}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Helper note */}
+                  <div style={{
+                    marginTop: 4,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    backgroundColor: "rgba(59, 130, 246, 0.08)",
+                    border: "1px solid rgba(59, 130, 246, 0.2)",
+                    fontSize: "0.82rem",
+                    color: "#93c5fd",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 6
+                  }}>
+                    <span style={{ flexShrink: 0 }}>ℹ️</span>
+                    <span>This form is for regular drainage and waterlogging issues, not major flood disasters. GPS + live weather data will be used to assess urgency automatically.</span>
                   </div>
                 </div>
               )}
@@ -1155,6 +1265,65 @@ export default function ComplaintForm() {
                 <span style={{ color: "#64748b" }}>{submissionSuccess.date}</span>
               </div>
             </div>
+
+            {/* ── FLOOD AI ASSESSMENT PANEL ── */}
+            {submissionSuccess.category === "flood" && submissionSuccess.floodRisk && (
+              <div
+                style={{
+                  backgroundColor: "rgba(37, 99, 235, 0.1)",
+                  border: "1px solid rgba(59, 130, 246, 0.35)",
+                  borderRadius: 10,
+                  padding: "14px 16px",
+                  marginBottom: 20
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: 16 }}>🤖</span>
+                  <strong style={{ fontSize: "0.88rem", color: "#93c5fd" }}>AI Drainage Assessment</strong>
+                  <span style={{
+                    marginLeft: "auto",
+                    fontSize: "0.72rem", fontWeight: 700,
+                    padding: "2px 8px", borderRadius: 20,
+                    backgroundColor: submissionSuccess.floodRisk.escalation_flag === "Yes" ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.15)",
+                    color: submissionSuccess.floodRisk.escalation_flag === "Yes" ? "#f87171" : "#86efac",
+                    border: `1px solid ${submissionSuccess.floodRisk.escalation_flag === "Yes" ? "rgba(239,68,68,0.4)" : "rgba(34,197,94,0.3)"}`
+                  }}>
+                    {submissionSuccess.floodRisk.escalation_flag === "Yes" ? "⚠ Escalation Risk" : "✓ Normal Priority"}
+                  </span>
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "#cbd5e1", display: "flex", flexDirection: "column", gap: 7 }}>
+                  {submissionSuccess.floodRisk.suggested_response && (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#94a3b8" }}>Suggested Response:</span>
+                      <span style={{ color: "#60a5fa", fontWeight: 600 }}>{submissionSuccess.floodRisk.suggested_response}</span>
+                    </div>
+                  )}
+                  {submissionSuccess.floodRisk.rainfall_7d_mm != null && (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#94a3b8" }}>7-Day Rainfall (GPS area):</span>
+                      <span style={{ color: "#93c5fd" }}>{submissionSuccess.floodRisk.rainfall_7d_mm} mm</span>
+                    </div>
+                  )}
+                  {submissionSuccess.floodRisk.risk_factors && submissionSuccess.floodRisk.risk_factors.length > 0 && (
+                    <div>
+                      <span style={{ color: "#94a3b8" }}>Key Risk Factors:</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", marginTop: 5 }}>
+                        {submissionSuccess.floodRisk.risk_factors.map((f, i) => (
+                          <span key={i} style={{
+                            fontSize: "0.74rem", padding: "2px 8px", borderRadius: 20,
+                            backgroundColor: "rgba(59, 130, 246, 0.15)",
+                            border: "1px solid rgba(59, 130, 246, 0.3)",
+                            color: "#bfdbfe"
+                          }}>
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* ── OPTIONAL LIGHT ACCOUNT CARD ── */}
             <div

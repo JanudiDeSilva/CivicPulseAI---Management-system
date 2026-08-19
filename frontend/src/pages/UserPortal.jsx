@@ -4,11 +4,11 @@ import { useAuth } from "../context/AuthContext";
 import { syncReports, deleteComplaint, trackGuestComplaint, fetchReportsByPhone } from "../services/api";
 
 const CATEGORY_META = {
-  flood:         { title: "Flood & Drainage",  icon: "🌊" },
-  road_damage:   { title: "Road Damages",      icon: "🚗" },
-  garbage:       { title: "Garbage & Waste",   icon: "🗑️" },
-  power_failure: { title: "Power Outages",     icon: "⚡" },
-  street_light:  { title: "Street Lights",     icon: "💡" },
+  flood:         { title: "Drainage & Waterlogging", icon: "🌊" },
+  road_damage:   { title: "Road Damages",            icon: "🚗" },
+  garbage:       { title: "Garbage & Waste",         icon: "🗑️" },
+  power_failure: { title: "Power Outages",           icon: "⚡" },
+  street_light:  { title: "Street Lights",           icon: "💡" },
 };
 
 const STORAGE_KEY = "civic_pulse_user_complaints";

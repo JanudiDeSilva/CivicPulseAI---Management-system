@@ -1,5 +1,5 @@
 const CATEGORY_LABELS = {
-    flood: "Flood & Drainage",
+    flood: "Drainage & Waterlogging",
     road_damage: "Road Damage",
     garbage: "Garbage & Waste",
     power_failure: "Power Failure",

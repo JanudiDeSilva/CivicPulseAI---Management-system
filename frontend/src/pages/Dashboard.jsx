@@ -67,26 +67,26 @@ function getReportDate(report, type = "created") {
 }
 
 function formatDuration(ms) {
-  if (ms == null || isNaN(ms) || ms < 0) return "—";
+  if (ms == null || isNaN(ms) || ms <= 0) return "—";
   const sec = Math.floor(ms / 1000);
   if (sec < 60) return "< 1m";
   const min = Math.floor(sec / 60);
   if (min < 60) return `${min}m`;
   const hr = ms / 3600000;
   if (hr < 24) return `${hr.toFixed(1)}h`;
-  const days = ms / 86400000;
+  const days = hr / 24;
   return `${days.toFixed(1)}d`;
 }
 
 function getReportResolutionDuration(report) {
-  if (!report || (report.status !== "Resolved" && report.status !== "Closed")) return null;
   if (report.resolution_time_display) return report.resolution_time_display;
   if (report.resolution_duration_ms) return formatDuration(report.resolution_duration_ms);
-
-  const created = getReportDate(report, "created");
-  const resolved = getReportDate(report, "resolved");
-  if (created && resolved) {
-    const diff = resolved.getTime() - created.getTime();
+  if (report.resolved_at && report.created_at) {
+    const diff = new Date(report.resolved_at).getTime() - new Date(report.created_at).getTime();
+    return formatDuration(Math.max(diff, 60000));
+  }
+  if (report.status === "Resolved" || report.status === "Closed") {
+    const diff = (report.updated_at ? new Date(report.updated_at).getTime() : Date.now()) - new Date(report.created_at).getTime();
     return formatDuration(Math.max(diff, 60000));
   }
   return "2.0h"; // default fallback for resolved items
@@ -94,36 +94,58 @@ function getReportResolutionDuration(report) {
 
 function resolveAiSeverity(report) {
   const direct = report?.severity || report?.severity_raw;
-  if (direct && direct !== "PENDING") return String(direct).toUpperCase();
+  if (direct && direct !== "PENDING" && direct !== "pending") return String(direct).toUpperCase();
   const rawMl = report?.ml_analysis || {};
   const ml = typeof rawMl === "string" ? (() => { try { return JSON.parse(rawMl); } catch { return {}; } })() : rawMl;
-  const floodRisk = report?.risk_signals?.floodRisk || {};
-  const nested = ml?.risk_level || ml?.severity || floodRisk?.risk_level || ml?.predicted_class || ml?.forced_min_priority;
-  if (nested) return String(nested).toUpperCase();
+  const floodRisk = report?.risk_signals?.floodRisk || report?.risk_signals?.drainageRisk || {};
+  const nested = ml?.severity || ml?.risk_level || ml?.urgency_severity || floodRisk?.severity || floodRisk?.risk_level || ml?.predicted_class || ml?.forced_min_priority;
+  if (nested && nested !== "PENDING") return String(nested).toUpperCase();
   if (ml?.confidence != null) {
     const v = Number(ml.confidence);
-    if (v >= 0.8) return "HIGH";
-    if (v >= 0.5) return "MEDIUM";
-    return "LOW";
+    if (!isNaN(v)) {
+      if (v >= 0.8) return "HIGH";
+      if (v >= 0.5) return "MEDIUM";
+      return "LOW";
+    }
+  }
+  if (ml?.priority_score != null) {
+    const p = Number(ml.priority_score);
+    if (!isNaN(p)) {
+      if (p >= 75) return "CRITICAL";
+      if (p >= 50) return "HIGH";
+      if (p >= 25) return "MEDIUM";
+      return "LOW";
+    }
   }
   if (ml?.image_damage_score != null || ml?.final_image_severity_score != null) {
     const v = Number(ml.image_damage_score || ml.final_image_severity_score);
-    if (v >= 0.6 || v >= 3) return "HIGH";
-    if (v >= 0.3 || v >= 1.5) return "MEDIUM";
-    return "LOW";
+    if (!isNaN(v)) {
+      if (v >= 0.6 || v >= 3) return "HIGH";
+      if (v >= 0.3 || v >= 1.5) return "MEDIUM";
+      return "LOW";
+    }
   }
-  return "PENDING";
+  return "MEDIUM";
 }
 
 function resolvePriorityScore(report) {
-  if (typeof report?.priority_score === "number") return report.priority_score;
-  const ml = report?.ml_analysis || {};
-  const floodRisk = report?.risk_signals?.floodRisk || {};
-  const value = ml?.flood_probability ?? ml?.confidence ?? floodRisk?.flood_probability ?? floodRisk?.confidence;
-  if (typeof value === "number") return Number(Math.min(Math.max(value, 0), 1).toFixed(2));
-  if (ml?.image_damage_score != null)
+  if (typeof report?.priority_score === "number" && !isNaN(report.priority_score)) {
+    return report.priority_score > 1 ? Number((report.priority_score / 100).toFixed(2)) : Number(report.priority_score.toFixed(2));
+  }
+  const rawMl = report?.ml_analysis || {};
+  const ml = typeof rawMl === "string" ? (() => { try { return JSON.parse(rawMl); } catch { return {}; } })() : rawMl;
+  if (typeof ml?.priority_score === "number" && !isNaN(ml.priority_score)) {
+    return ml.priority_score > 1 ? Number((ml.priority_score / 100).toFixed(2)) : Number(ml.priority_score.toFixed(2));
+  }
+  const floodRisk = report?.risk_signals?.floodRisk || report?.risk_signals?.drainageRisk || {};
+  const value = ml?.drainage_score ?? ml?.flood_probability ?? ml?.confidence ?? floodRisk?.flood_probability ?? floodRisk?.confidence;
+  if (typeof value === "number" && !isNaN(value)) {
+    return value > 1 ? Number((value / 100).toFixed(2)) : Number(Math.min(Math.max(value, 0), 1).toFixed(2));
+  }
+  if (ml?.image_damage_score != null && !isNaN(Number(ml.image_damage_score))) {
     return Number(Math.min(Math.max(Number(ml.image_damage_score) / 10, 0.15), 0.95).toFixed(2));
-  return 0;
+  }
+  return 0.45;
 }
 
 function startOfDay(d) {
@@ -1449,49 +1471,78 @@ export default function Dashboard() {
                               onClick={e => { e.stopPropagation(); setExpandedFlood(expandedFlood === item.id ? null : item.id); }}
                               style={{ fontSize: "0.7rem", background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.4)", color: "#93c5fd", borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}
                             >
-                              🤖 ML Details {expandedFlood === item.id ? "▲" : "▼"}
+                              🤖 AI Details {expandedFlood === item.id ? "▲" : "▼"}
                             </button>
-                            {expandedFlood === item.id && (
-                              <div style={{ marginTop: 6, padding: "10px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 8, fontSize: "0.75rem" }}>
-                                <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 6, fontSize: "0.78rem" }}>🌊 XGBoost Flood AI Model</div>
-                                <div style={{ display: "grid", gap: 4 }}>
-                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                    <span style={{ color: "#64748b" }}>Flood Risk Level:</span>
-                                    <span style={{ color: item.severity === "CRITICAL" ? "#ef4444" : item.severity === "HIGH" ? "#f97316" : "#eab308", fontWeight: 700 }}>{item.severity}</span>
-                                  </div>
-                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                    <span style={{ color: "#64748b" }}>Flood Probability:</span>
-                                    <span style={{ color: "#f8fafc", fontWeight: 600 }}>{(item.priority_score * 100).toFixed(1)}%</span>
-                                  </div>
-                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                    <span style={{ color: "#64748b" }}>Flood Predicted:</span>
-                                    <span style={{ color: item.predicted_escalation === "YES" ? "#ef4444" : "#4ade80", fontWeight: 700 }}>{item.predicted_escalation || "—"}</span>
-                                  </div>
-                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                    <span style={{ color: "#64748b" }}>Confidence:</span>
-                                    <span style={{ color: "#f8fafc" }}>{item.escalation_confidence ? (item.escalation_confidence * 100).toFixed(0) + "%" : "—"}</span>
-                                  </div>
-                                </div>
-                                <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(59,130,246,0.2)", color: "#64748b", fontSize: "0.72rem" }}>
-                                  {(item.elevation_m != null || item.distance_to_river_m != null || item.rainfall_7d_mm != null || item.monthly_rainfall_mm != null || item.population_density_per_km2 != null || item.ndvi != null || item.ndwi != null) ? (
-                                    <div style={{ display: "grid", gap: "4px", marginTop: 4 }}>
-                                      {item.elevation_m != null && <div><strong>Elevation:</strong> {item.elevation_m} m</div>}
-                                      {item.distance_to_river_m != null && <div><strong>Dist. to River:</strong> {item.distance_to_river_m} m</div>}
-                                      {item.rainfall_7d_mm != null && <div><strong>Rainfall (7d):</strong> {item.rainfall_7d_mm} mm</div>}
-                                      {item.monthly_rainfall_mm != null && <div><strong>Monthly Rainfall:</strong> {item.monthly_rainfall_mm} mm</div>}
-                                      {item.population_density_per_km2 != null && <div><strong>Population Density:</strong> {item.population_density_per_km2} /km²</div>}
-                                      {item.ndvi != null && <div><strong>NDVI:</strong> {item.ndvi}</div>}
-                                      {item.ndwi != null && <div><strong>NDWI:</strong> {item.ndwi}</div>}
+                            {expandedFlood === item.id && (() => {
+                              const rawMl = item.ml_analysis || {};
+                              const ml = typeof rawMl === "string" ? (() => { try { return JSON.parse(rawMl); } catch { return {}; } })() : rawMl;
+                              const riskFactors = ml?.risk_factors || [];
+                              const suggestedResponse = ml?.suggested_response || null;
+                              const escalationFlag = ml?.escalation_flag || item.predicted_escalation || null;
+                              const rainfall = ml?.rainfall_7d_mm ?? item.rainfall_7d_mm ?? null;
+                              const priorityScore = ml?.priority_score ?? (item.priority_score != null ? Math.round(item.priority_score * (item.priority_score <= 1 ? 100 : 1)) : null);
+                              return (
+                                <div style={{ marginTop: 6, padding: "10px", background: "rgba(15,23,42,0.95)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 8, fontSize: "0.75rem", minWidth: 220 }}>
+                                  <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 8, fontSize: "0.78rem" }}>🌊 Drainage & Waterlogging Assessment</div>
+                                  <div style={{ display: "grid", gap: 5 }}>
+                                    {/* Urgency Severity */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                      <span style={{ color: "#64748b" }}>Urgency Severity:</span>
+                                      <span style={{
+                                        padding: "1px 7px", borderRadius: 5, fontWeight: 700, fontSize: "0.72rem",
+                                        background: aiSeverity === "CRITICAL" ? "rgba(239,68,68,0.2)" : aiSeverity === "HIGH" ? "rgba(249,115,22,0.2)" : aiSeverity === "MEDIUM" ? "rgba(234,179,8,0.18)" : "rgba(34,197,94,0.15)",
+                                        color: aiSeverity === "CRITICAL" ? "#f87171" : aiSeverity === "HIGH" ? "#fb923c" : aiSeverity === "MEDIUM" ? "#facc15" : "#86efac"
+                                      }}>{aiSeverity || "—"}</span>
                                     </div>
-                                  ) : (
-                                    <div>📡 Model inputs: district geo-features, live 7-day rainfall, elevation, distance to river, soil type, NDVI/NDWI &amp; population density.</div>
+                                    {/* Priority Score */}
+                                    {priorityScore != null && (
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Priority Score:</span>
+                                        <span style={{ color: "#f8fafc", fontWeight: 700 }}>{priorityScore}<span style={{ color: "#64748b", fontWeight: 400 }}>/100</span></span>
+                                      </div>
+                                    )}
+                                    {/* Escalation */}
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                      <span style={{ color: "#64748b" }}>Escalation Flag:</span>
+                                      <span style={{ color: (escalationFlag === "YES" || escalationFlag === "Yes") ? "#f87171" : "#4ade80", fontWeight: 700 }}>
+                                        {(escalationFlag === "YES" || escalationFlag === "Yes") ? "⚠ YES" : "✓ No"}
+                                      </span>
+                                    </div>
+                                    {/* Suggested Response */}
+                                    {suggestedResponse && (
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>Response Target:</span>
+                                        <span style={{ color: "#60a5fa", fontWeight: 600 }}>{suggestedResponse}</span>
+                                      </div>
+                                    )}
+                                    {/* Rainfall */}
+                                    {rainfall != null && (
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ color: "#64748b" }}>7-Day Rainfall:</span>
+                                        <span style={{ color: "#93c5fd" }}>{rainfall} mm</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* Risk Factors */}
+                                  {riskFactors.length > 0 && (
+                                    <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(59,130,246,0.2)" }}>
+                                      <div style={{ color: "#64748b", marginBottom: 4 }}>Key Risk Factors:</div>
+                                      <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 6px" }}>
+                                        {riskFactors.map((f, i) => (
+                                          <span key={i} style={{ fontSize: "0.7rem", padding: "1px 7px", borderRadius: 20, background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)", color: "#bfdbfe" }}>{f}</span>
+                                        ))}
+                                      </div>
+                                    </div>
                                   )}
+                                  <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(59,130,246,0.15)", color: "#475569", fontSize: "0.7rem" }}>
+                                    📡 Uses GPS location + live 7-day rainfall + district drainage index
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         )}
-                        {item.category !== "flood" && item.predicted_escalation === "YES" && (
+                        {item.predicted_escalation === "YES" && (
                           <div style={{ fontSize: "0.7rem", color: "#f87171", marginTop: 3 }}>⚠ Escalation Risk</div>
                         )}
                       </td>
@@ -1644,9 +1695,68 @@ export default function Dashboard() {
             </div>
 
             <div style={{ marginTop: 18, background: "rgba(15,23,42,0.75)", border: "1px solid #334155", borderRadius: 12, padding: 16 }}>
-              <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 12 }}>ML prediction details</div>
+              <div style={{ color: "#93c5fd", fontWeight: 700, marginBottom: 12 }}>ML / AI Assessment Details</div>
               {!mlData || Object.keys(mlData).length === 0 ? (
                 <div style={{ color: "#64748b" }}>No ML prediction result stored for this complaint.</div>
+              ) : (item.category === "flood" || mlData?.type === "flood") ? (
+                // ── Drainage & Waterlogging formatted card ──
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+                    {/* Severity */}
+                    <div style={{ background: "rgba(30,41,59,0.65)", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
+                      <div style={{ color: "#94a3b8", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Urgency Severity</div>
+                      <span style={{
+                        padding: "3px 10px", borderRadius: 6, fontSize: "0.82rem", fontWeight: 700,
+                        background: (mlData.severity || mlData.risk_level || item.severity) === "CRITICAL" ? "rgba(239,68,68,0.2)" : (mlData.severity || mlData.risk_level || item.severity) === "HIGH" ? "rgba(249,115,22,0.2)" : (mlData.severity || mlData.risk_level || item.severity) === "MEDIUM" ? "rgba(234,179,8,0.2)" : "rgba(34,197,94,0.15)",
+                        color: (mlData.severity || mlData.risk_level || item.severity) === "CRITICAL" ? "#f87171" : (mlData.severity || mlData.risk_level || item.severity) === "HIGH" ? "#fb923c" : (mlData.severity || mlData.risk_level || item.severity) === "MEDIUM" ? "#facc15" : "#86efac",
+                        border: "1px solid rgba(255,255,255,0.1)"
+                      }}>
+                        {mlData.severity || mlData.risk_level || item.severity || "—"}
+                      </span>
+                    </div>
+                    {/* Priority Score */}
+                    <div style={{ background: "rgba(30,41,59,0.65)", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
+                      <div style={{ color: "#94a3b8", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Priority Score</div>
+                      <div style={{ color: "#f8fafc", fontWeight: 700, fontSize: "1.1rem" }}>
+                        {mlData.priority_score != null ? mlData.priority_score : (item.priority_score != null ? Math.round(item.priority_score * (item.priority_score <= 1 ? 100 : 1)) : "—")}
+                        <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: "0.75rem" }}>/100</span>
+                      </div>
+                    </div>
+                    {/* Escalation */}
+                    <div style={{ background: "rgba(30,41,59,0.65)", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
+                      <div style={{ color: "#94a3b8", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Escalation Flag</div>
+                      <div style={{ color: (mlData.escalation_flag === "Yes" || mlData.escalation_flag === "YES" || item.predicted_escalation === "YES") ? "#f87171" : "#86efac", fontWeight: 700 }}>
+                        {(mlData.escalation_flag === "Yes" || mlData.escalation_flag === "YES" || item.predicted_escalation === "YES") ? "⚠ YES — Escalate" : "✓ No"}
+                      </div>
+                    </div>
+                    {/* Response */}
+                    <div style={{ background: "rgba(30,41,59,0.65)", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
+                      <div style={{ color: "#94a3b8", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Response Target</div>
+                      <div style={{ color: "#60a5fa", fontWeight: 600, fontSize: "0.88rem" }}>{mlData.suggested_response || "Standard Dispatch (24–48h)"}</div>
+                    </div>
+                    {/* Rainfall */}
+                    {(mlData.rainfall_7d_mm != null || item.rainfall_7d_mm != null) && (
+                      <div style={{ background: "rgba(30,41,59,0.65)", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
+                        <div style={{ color: "#94a3b8", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>7-Day Rainfall</div>
+                        <div style={{ color: "#93c5fd" }}>{mlData.rainfall_7d_mm ?? item.rainfall_7d_mm} mm</div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Risk Factors */}
+                  {mlData.risk_factors && mlData.risk_factors.length > 0 && (
+                    <div style={{ background: "rgba(30,41,59,0.65)", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
+                      <div style={{ color: "#94a3b8", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Key Risk Factors</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px" }}>
+                        {mlData.risk_factors.map((f, i) => (
+                          <span key={i} style={{
+                            fontSize: "0.78rem", padding: "3px 10px", borderRadius: 20,
+                            background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)", color: "#bfdbfe"
+                          }}>{f}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
                   {Object.entries(mlData).map(([key, value]) => (

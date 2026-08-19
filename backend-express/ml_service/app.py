@@ -301,6 +301,13 @@ class ComplaintInput(BaseModel):
 
     water_presence_flag: Optional[float] = 0
 
+    problem_type: Optional[str] = None
+    severity_waterlogging: Optional[str] = None
+    water_status: Optional[str] = None
+    duration: Optional[str] = None
+    impact: Optional[list] = None
+    description: Optional[str] = None
+
 
 # ============================================================
 # FLOOD PREDICTION FUNCTION
@@ -1492,19 +1499,8 @@ async def predict_from_complaint(
         district_key
     )
 
-    if not base:
-
-        return {
-
-            "error":
-                f"No lookup data for district "
-                f"'{payload.district}'"
-        }
-
     rainfall = {
-
         "rainfall_7d_mm": 0.0,
-
         "monthly_rainfall_mm": 0.0
     }
 
@@ -1512,46 +1508,165 @@ async def predict_from_complaint(
         payload.latitude is not None
         and payload.longitude is not None
     ):
-
         rainfall = await get_live_rainfall(
             payload.latitude,
             payload.longitude
         )
 
-    features = FloodFeatures(
+    # Try ML model if district data exists
+    base_prob = 0.35  # default heuristic base
+    drainage_idx = 0.5
 
-        **base,
+    if base:
+        try:
+            features = FloodFeatures(
+                **base,
+                **rainfall,
+                district=district_key,
+                place_name=(
+                    payload.place_name
+                    or district_key
+                ),
+                latitude=(
+                    payload.latitude
+                    if payload.latitude is not None
+                    else 0.0
+                ),
+                longitude=(
+                    payload.longitude
+                    if payload.longitude is not None
+                    else 0.0
+                ),
+                water_presence_flag=(
+                    payload.water_presence_flag
+                    or 0
+                )
+            )
+            base_res = run_flood_prediction(features)
+            if not base_res.get("error"):
+                base_prob = base_res.get("flood_probability", 0.35)
+            drainage_idx = base.get("drainage_index", 0.5)
+        except Exception:
+            pass  # fall through to heuristic scoring
 
-        **rainfall,
+    # Calculate refined severity & priority score for the municipal response team
+    # Base priority (up to 45 points) based on static infrastructure + recent rainfall
+    priority_score = int(base_prob * 45)
 
-        district=district_key,
+    # Add points for Severity of Waterlogging
+    sev_wl = payload.severity_waterlogging or ""
+    if "Minor" in sev_wl:
+        priority_score += 10
+    elif "Moderate" in sev_wl:
+        priority_score += 20
+    elif "Severe" in sev_wl:
+        priority_score += 35
+    elif "Extreme" in sev_wl:
+        priority_score += 48
 
-        place_name=(
-            payload.place_name
-            or district_key
-        ),
+    # Add points for Water Status (Stagnant vs Flowing)
+    if payload.water_status == "Stagnant":
+        priority_score += 7
+    elif payload.water_status == "Both":
+        priority_score += 4
 
-        latitude=(
-            payload.latitude
-            if payload.latitude is not None
-            else 0.0
-        ),
+    # Add points for Duration
+    dur = payload.duration or ""
+    if "Recurring" in dur:
+        priority_score += 12
+    elif "Several" in dur:
+        priority_score += 8
+    elif "1" in dur and "2" in dur:
+        priority_score += 5
+    else:  # Just started
+        priority_score += 2
 
-        longitude=(
-            payload.longitude
-            if payload.longitude is not None
-            else 0.0
-        ),
+    # Add points for impact checkboxes (up to 15 points)
+    imp_list = payload.impact or []
+    priority_score += min(len(imp_list) * 3, 15)
 
-        water_presence_flag=(
-            payload.water_presence_flag
-            or 0
-        )
-    )
+    # Rainfall bonus
+    rain_mm = rainfall.get("rainfall_7d_mm", 0.0)
+    if rain_mm > 50:
+        priority_score += 8
+    elif rain_mm > 18:
+        priority_score += 4
 
-    return run_flood_prediction(
-        features
-    )
+    # Clamp priority_score between 0 and 100
+    priority_score = max(0, min(priority_score, 100))
+
+    # Derive Severity Level
+    if priority_score >= 82:
+        severity = "CRITICAL"
+    elif priority_score >= 58:
+        severity = "HIGH"
+    elif priority_score >= 32:
+        severity = "MEDIUM"
+    else:
+        severity = "LOW"
+
+    # Escalation Flag
+    has_entering_impact = any("entering" in str(x).lower() for x in imp_list)
+    is_extreme = "Extreme" in sev_wl
+
+    if is_extreme or has_entering_impact or priority_score >= 85:
+        escalation_flag = "Yes"
+    else:
+        escalation_flag = "No"
+
+    # Suggested Response
+    if severity == "CRITICAL":
+        suggested_response = "Within 4 hours"
+    elif severity == "HIGH":
+        suggested_response = "Within 12 hours"
+    elif severity == "MEDIUM":
+        suggested_response = "Within 24 hours"
+    else:
+        suggested_response = "Routine (Within 48 hours)"
+
+    # Build Main Risk Factors list
+    risk_factors = []
+    if rain_mm > 18:
+        risk_factors.append("Recent heavy rain")
+
+    if drainage_idx is not None and drainage_idx < 0.45:
+        risk_factors.append("Poor drainage infrastructure")
+
+    if payload.water_status == "Stagnant":
+        risk_factors.append("Stagnant water (vector risk)")
+
+    if is_extreme or "Severe" in sev_wl:
+        risk_factors.append("Severe waterlogging")
+
+    prob_type = payload.problem_type or ""
+    if "Blocked" in prob_type or "Clogged" in prob_type:
+        risk_factors.append("Clogged storm drain / grate")
+    elif "Overflowing" in prob_type:
+        risk_factors.append("Overflowing open canal / drain")
+    elif "Capacity" in prob_type:
+        risk_factors.append("Inadequate municipal drainage capacity")
+    elif "Stagnant" in prob_type:
+        risk_factors.append("Stagnant water health risk")
+    elif "Broken" in prob_type or "Missing" in prob_type:
+        risk_factors.append("Broken / missing drain cover")
+    elif "Collapsed" in prob_type or "Damaged" in prob_type:
+        risk_factors.append("Damaged culvert / pipe")
+
+    if not risk_factors:
+        risk_factors.append("Drainage obstruction / waterlogging")
+
+    risk_factors = risk_factors[:4]
+
+    return {
+        "severity": severity,
+        "priority_score": priority_score,
+        "risk_factors": risk_factors,
+        "suggested_response": suggested_response,
+        "escalation_flag": escalation_flag,
+        "rainfall_7d_mm": round(rain_mm, 2),
+        "drainage_index": drainage_idx,
+        "base_flood_probability": round(base_prob, 4)
+    }
 
 
 # ============================================================
