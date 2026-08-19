@@ -34,6 +34,7 @@ const Report = sequelize.define("Report", {
     escalation_confidence: DataTypes.FLOAT,
 
     status: { type: DataTypes.STRING, defaultValue: "Registered" },
+    resolved_at: { type: DataTypes.DATE, allowNull: true },
     admin_reply: { type: DataTypes.TEXT, allowNull: true },
     // Numeric model input fields
     elevation_m: DataTypes.FLOAT,
@@ -54,7 +55,7 @@ const Report = sequelize.define("Report", {
     tableName: "reports",
     timestamps: true,
     createdAt: "created_at",
-    updatedAt: false,
+    updatedAt: "updated_at",
 });
 
 export default Report;

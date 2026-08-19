@@ -28,14 +28,7 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/login" element={<AuthPage />} />
-                <Route
-                  path="/complaint"
-                  element={
-                    <ProtectedRoute role="user">
-                      <Complaint />
-                    </ProtectedRoute>
-                  }
-                />
+                <Route path="/complaint" element={<Complaint />} />
                 <Route path="/success" element={<Success />} />
                 <Route
                   path="/dashboard"
@@ -45,14 +38,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/my-portal"
-                  element={
-                    <ProtectedRoute role="user">
-                      <UserPortal />
-                    </ProtectedRoute>
-                  }
-                />
+                <Route path="/my-portal" element={<UserPortal />} />
                 <Route path="/garbage-test" element={<GarbageClassifier />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

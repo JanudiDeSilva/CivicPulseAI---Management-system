@@ -1,31 +1,16 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-
-const initialSignup = {
-  firstName: "",
-  lastName: "",
-  email: "",
-  phone: "",
-  nic: "",
-  password: "",
-  confirmPassword: "",
-};
 
 const initialLogin = {
   email: "",
-  nic: "",
   password: "",
-  role: "user",
 };
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { signupUser, loginWithPassword, session } = useAuth();
-  const [mode, setMode] = useState("signin");
-  const [signupForm, setSignupForm] = useState(initialSignup);
+  const { loginWithPassword, session } = useAuth();
   const [loginForm, setLoginForm] = useState(initialLogin);
-  const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -35,40 +20,30 @@ export default function AuthPage() {
     }
   }, [session, navigate]);
 
-
-  const handleSignUp = async (event) => {
-    event.preventDefault();
-    try {
-      setLoading(true);
-      setError("");
-      signupUser(signupForm);
-      setMode("signin");
-      setSuccessMessage("Registration complete. Please sign in with your new credentials.");
-      setSignupForm(initialSignup);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSignIn = async (event) => {
     event.preventDefault();
     try {
       setLoading(true);
       setError("");
 
-      if (loginForm.role === "admin") {
-        if (!loginForm.email || !loginForm.password) {
-          throw new Error("Admin email and password are required.");
-        }
-      } else {
-        if (!loginForm.nic || !loginForm.password) {
-          throw new Error("NIC number and password are required for the user portal.");
-        }
+      if (!loginForm.email || !loginForm.password) {
+        throw new Error("Admin email and password are required.");
       }
 
-      loginWithPassword(loginForm);
+      // Hardcoded Admin login credentials verification
+      if (
+        loginForm.email.trim().toLowerCase() !== "onethrajanu2003@gmail.com" ||
+        loginForm.password !== "janudi"
+      ) {
+        throw new Error("Invalid admin credentials. Please use the authorized email and password.");
+      }
+
+      // Pass it through AuthContext loginWithPassword to set session
+      loginWithPassword({
+        email: loginForm.email.trim(),
+        password: loginForm.password,
+        role: "admin",
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -78,177 +53,75 @@ export default function AuthPage() {
 
   return (
     <div className="auth-shell">
-      <div className="glass-card auth-card">
-        <div className="auth-header">
+      <div className="glass-card auth-card" style={{ maxWidth: 460 }}>
+        <div className="auth-header" style={{ marginBottom: 20 }}>
           <div>
             <span className="eyebrow">CivicPulse AI</span>
-            <h1>Common Portal Access</h1>
-          </div>
-          <div className="role-toggle">
-            <button
-              type="button"
-              className={mode === "signin" ? "tab active" : "tab"}
-              onClick={() => setMode("signin")}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              className={mode === "signup" ? "tab active" : "tab"}
-              onClick={() => setMode("signup")}
-            >
-              Sign Up
-            </button>
+            <h1>Admin Portal Access</h1>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: 4 }}>
+              Authorized municipal administrator login only.
+            </p>
           </div>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
-        {successMessage && <div className="auth-success">{successMessage}</div>}
+        {/* Guest access notice */}
+        <div style={{
+          backgroundColor: "rgba(59, 130, 246, 0.1)",
+          border: "1px solid rgba(59, 130, 246, 0.3)",
+          borderRadius: 10,
+          padding: "12px 14px",
+          marginBottom: 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10
+        }}>
+          <div>
+            <strong style={{ fontSize: "0.82rem", color: "#93c5fd" }}>Are you a Citizen?</strong>
+            <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "2px 0 0 0", lineHeight: 1.4 }}>
+              Submit reports directly or track live status as a guest. No registration is required.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link to="/complaint" className="btn btn-primary" style={{ fontSize: "0.75rem", padding: "6px 12px", flex: 1, justifyContent: "center" }}>
+              Lodge Complaint
+            </Link>
+            <Link to="/my-portal" className="btn btn-secondary" style={{ fontSize: "0.75rem", padding: "6px 12px", flex: 1, justifyContent: "center" }}>
+              Track Status
+            </Link>
+          </div>
+        </div>
 
-        {mode === "signin" ? (
-          <form onSubmit={handleSignIn} className="auth-form">
-            <label className="form-group">
-              <span className="form-label">Portal Role</span>
-              <select
-                className="form-select"
-                value={loginForm.role}
-                onChange={(e) => setLoginForm((prev) => ({ ...prev, role: e.target.value }))}
-              >
-                <option value="user">User Portal</option>
-                <option value="admin">Admin Portal</option>
-              </select>
-            </label>
+        {error && <div className="auth-error" style={{ marginBottom: 16 }}>{error}</div>}
 
-            {loginForm.role === "admin" ? (
-              <label className="form-group">
-                <span className="form-label">Admin Email Address</span>
-                <input
-                  className="form-input"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={loginForm.email}
-                  onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))}
-                />
-              </label>
-            ) : (
-              <label className="form-group">
-                <span className="form-label">NIC Number</span>
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="Enter your NIC"
-                  value={loginForm.nic}
-                  onChange={(e) => setLoginForm((prev) => ({ ...prev, nic: e.target.value }))}
-                />
-              </label>
-            )}
+        <form onSubmit={handleSignIn} className="auth-form">
+          <div className="form-group">
+            <span className="form-label">Admin Email Address</span>
+            <input
+              className="form-input"
+              type="email"
+              placeholder="e.g. admin@civicpulse.gov"
+              value={loginForm.email}
+              onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))}
+              required
+            />
+          </div>
 
-            <label className="form-group">
-              <span className="form-label">Password</span>
-              <input
-                className="form-input"
-                type="password"
-                placeholder="Enter your password"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
-              />
-            </label>
+          <div className="form-group">
+            <span className="form-label">Password</span>
+            <input
+              className="form-input"
+              type="password"
+              placeholder="Enter admin password"
+              value={loginForm.password}
+              onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
+              required
+            />
+          </div>
 
-
-
-            <button className="btn btn-primary auth-cta" type="submit" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In to Portal"}
-            </button>
-
-
-          </form>
-        ) : (
-          <form onSubmit={handleSignUp} className="auth-form">
-            <div className="grid-2">
-              <label className="form-group">
-                <span className="form-label">First Name</span>
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="Enter first name"
-                  value={signupForm.firstName}
-                  onChange={(e) => setSignupForm((prev) => ({ ...prev, firstName: e.target.value }))}
-                />
-              </label>
-              <label className="form-group">
-                <span className="form-label">Last Name</span>
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="Enter last name"
-                  value={signupForm.lastName}
-                  onChange={(e) => setSignupForm((prev) => ({ ...prev, lastName: e.target.value }))}
-                />
-              </label>
-            </div>
-
-            <label className="form-group">
-              <span className="form-label">Email Address</span>
-              <input
-                className="form-input"
-                type="email"
-                placeholder="name@example.com"
-                value={signupForm.email}
-                onChange={(e) => setSignupForm((prev) => ({ ...prev, email: e.target.value }))}
-              />
-            </label>
-
-            <div className="grid-2">
-              <label className="form-group">
-                <span className="form-label">Phone Number</span>
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="Enter phone number"
-                  value={signupForm.phone}
-                  onChange={(e) => setSignupForm((prev) => ({ ...prev, phone: e.target.value }))}
-                />
-              </label>
-              <label className="form-group">
-                <span className="form-label">NIC Number</span>
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="Enter NIC"
-                  value={signupForm.nic}
-                  onChange={(e) => setSignupForm((prev) => ({ ...prev, nic: e.target.value }))}
-                />
-              </label>
-            </div>
-
-            <div className="grid-2">
-              <label className="form-group">
-                <span className="form-label">Password</span>
-                <input
-                  className="form-input"
-                  type="password"
-                  placeholder="Create password"
-                  value={signupForm.password}
-                  onChange={(e) => setSignupForm((prev) => ({ ...prev, password: e.target.value }))}
-                />
-              </label>
-              <label className="form-group">
-                <span className="form-label">Confirm Password</span>
-                <input
-                  className="form-input"
-                  type="password"
-                  placeholder="Confirm password"
-                  value={signupForm.confirmPassword}
-                  onChange={(e) => setSignupForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                />
-              </label>
-            </div>
-
-            <button className="btn btn-primary auth-cta" type="submit" disabled={loading}>
-              {loading ? "Registering..." : "Register"}
-            </button>
-          </form>
-        )}
+          <button className="btn btn-primary auth-cta" type="submit" disabled={loading} style={{ width: "100%", marginTop: 12 }}>
+            {loading ? "Verifying..." : "Sign In to Admin Dashboard"}
+          </button>
+        </form>
       </div>
     </div>
   );

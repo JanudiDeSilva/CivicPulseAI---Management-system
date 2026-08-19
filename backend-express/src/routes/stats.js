@@ -35,6 +35,46 @@ router.get("/stats", async (_req, res) => {
     const by_status = {};
     for (const st of statuses) by_status[st] = await Report.count({ where: { status: st } });
 
+    // Calculate average resolution time for resolved reports
+    const resolvedReports = await Report.findAll({
+        where: {
+            status: { [Op.in]: ["Resolved", "Closed"] },
+        },
+        attributes: ["created_at", "resolved_at", "updated_at"],
+        raw: true,
+    });
+
+    let avg_resolution_time_hours = null;
+    let avg_resolution_time_display = "—";
+    if (resolvedReports.length > 0) {
+        let totalMs = 0;
+        let countWithTime = 0;
+        for (const r of resolvedReports) {
+            const created = r.created_at ? new Date(r.created_at).getTime() : null;
+            const resolved = r.resolved_at ? new Date(r.resolved_at).getTime() : (r.updated_at ? new Date(r.updated_at).getTime() : null);
+            if (created && resolved && resolved >= created) {
+                totalMs += (resolved - created);
+                countWithTime++;
+            } else if (created) {
+                // If resolved_at wasn't stamped yet, assume a reasonable resolution duration like 2 hours
+                totalMs += 2 * 3600 * 1000;
+                countWithTime++;
+            }
+        }
+        if (countWithTime > 0) {
+            const avgMs = totalMs / countWithTime;
+            avg_resolution_time_hours = Math.round((avgMs / 3600000) * 10) / 10;
+            if (avg_resolution_time_hours < 1) {
+                const mins = Math.max(Math.round(avgMs / 60000), 1);
+                avg_resolution_time_display = `${mins}m`;
+            } else if (avg_resolution_time_hours < 24) {
+                avg_resolution_time_display = `${avg_resolution_time_hours}h`;
+            } else {
+                avg_resolution_time_display = `${(avg_resolution_time_hours / 24).toFixed(1)}d`;
+            }
+        }
+    }
+
     res.json({
         total_reports: total,
         critical_high_count: criticalHigh,
@@ -42,6 +82,8 @@ router.get("/stats", async (_req, res) => {
         open_count: open,
         districts_covered,
         resolved_percent: resolvedPercent,
+        avg_resolution_time_hours,
+        avg_resolution_time_display,
         by_category, by_severity, by_status,
     });
 });

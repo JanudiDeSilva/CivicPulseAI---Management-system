@@ -78,7 +78,7 @@ export default function Navbar() {
 
               {/* Complaint */}
               <Link
-                to={session ? "/complaint" : "/login"}
+                to="/complaint"
                 className={`navbar-link${
                   isActive("/complaint") ? " active" : ""
                 }`}
@@ -86,17 +86,15 @@ export default function Navbar() {
                 {t("nav_complaint")}
               </Link>
 
-              {/* My Portal - Only for logged-in users */}
-              {session?.role === "user" && (
-                <Link
-                  to="/my-portal"
-                  className={`navbar-link${
-                    isActive("/my-portal") ? " active" : ""
-                  }`}
-                >
-                  My Portal
-                </Link>
-              )}
+              {/* Track Complaint / My Portal */}
+              <Link
+                to="/my-portal"
+                className={`navbar-link${
+                  isActive("/my-portal") ? " active" : ""
+                }`}
+              >
+                {session?.role === "user" ? "My Complaints" : "Track Complaint"}
+              </Link>
             </>
           )}
         </nav>
@@ -200,7 +198,7 @@ export default function Navbar() {
                 padding: "8px 14px",
               }}
             >
-              Sign In
+              Admin Sign In
             </Link>
           )}
         </div>

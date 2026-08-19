@@ -21,19 +21,22 @@ export default function Success() {
           ✅
         </div>
 
-        <h2 style={{ fontSize: "2rem", marginBottom: 12 }}>Complaint Registered Successfully!</h2>
+        <h2 style={{ fontSize: "2rem", marginBottom: 12 }}>Complaint Registered!</h2>
         
-        <p style={{ fontSize: "1.05rem", color: "#94a3b8", marginBottom: 24 }}>
-          Our AI system has analyzed and triaged your complaint. Field officers from the relevant 
-          municipal department have been notified.
+        <p style={{ fontSize: "1.02rem", color: "#94a3b8", marginBottom: 24, lineHeight: 1.6 }}>
+          Your complaint has been logged and triaged with instant AI classification.
+          Field officers from the relevant municipal department have been notified.
         </p>
 
-        <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
-          <Link to="/complaint" className="btn btn-primary">
-            Submit Another Complaint
+        <div style={{ display: "flex", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
+          <Link to="/my-portal" className="btn btn-primary" style={{ padding: "12px 24px" }}>
+            🔍 Track Complaint Status
           </Link>
-          <Link to="/" className="btn btn-secondary">
-            Return to Home
+          <Link to="/complaint" className="btn btn-secondary" style={{ padding: "12px 24px" }}>
+            + Lodge Another Complaint
+          </Link>
+          <Link to="/" className="btn btn-secondary" style={{ padding: "12px 20px" }}>
+            Return Home
           </Link>
         </div>
       </div>
