@@ -1,26 +1,149 @@
-# =========================
+# =====================================================
 # Python
-# =========================
+# =====================================================
+
+# Virtual environments
+venv/
+env/
+.venv/
 backend/venv/
-backend/.env
-backend/__pycache__/
+backend-express/ml_service/venv/
+
+# Python cache
+__pycache__/
 **/__pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 
-# =========================
-# React / Node.js
-# =========================
-frontend/node_modules/
+# Environment variables
+.env
+*.env
+backend/.env
+backend-express/ml_service/.env
+
+# Python build files
+build/
+dist/
+*.egg-info/
+.eggs/
+
+
+# =====================================================
+# Machine Learning Models / Weights
+# =====================================================
+
+# Model files
+*.pt
+*.pth
+*.onnx
+*.keras
+*.h5
+*.pkl
+*.pickle
+*.joblib
+
+# Training outputs
+runs/
+weights/
+checkpoints/
+wandb/
+mlruns/
+
+
+# =====================================================
+# Node.js / React
+# =====================================================
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
 frontend/dist/
+backend-express/dist/
+.next/
+out/
 
-# =========================
+# Package manager files (optional)
+# Uncomment if you don't want lock files
+# package-lock.json
+# yarn.lock
+
+
+# =====================================================
+# React / Vite / Next cache
+# =====================================================
+
+.vite/
+.cache/
+.npm/
+
+
+# =====================================================
+# Database / Local files
+# =====================================================
+
+*.sqlite
+*.db
+database.sqlite
+
+
+# =====================================================
+# Logs
+# =====================================================
+
+*.log
+logs/
+
+
+# =====================================================
 # VS Code
-# =========================
+# =====================================================
+
 .vscode/
 
-# =========================
-# Operating System Files
-# =========================
+
+# =====================================================
+# Operating System
+# =====================================================
+
 .DS_Store
 Thumbs.db
+desktop.ini
+
+
+# =====================================================
+# Jupyter Notebook
+# =====================================================
+
+.ipynb_checkpoints/
+
+
+# =====================================================
+# Temporary Files
+# =====================================================
+
+*.tmp
+*.temp
+*.bak
+*.swp
+
+
+# =====================================================
+# Uploads / User Generated Files
+# =====================================================
+
+uploads/
+media/
+static/uploads/
+
+
+# =====================================================
+# Secrets / Keys
+# =====================================================
+
+*.pem
+*.key
+credentials.json
+serviceAccount.json
