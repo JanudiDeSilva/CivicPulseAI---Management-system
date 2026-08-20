@@ -1,6 +1,6 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import { Report } from "../models/index.js";
+import { Report, ReportImage } from "../models/index.js";
 import { triage } from "../services/triage.js";
 import {
     getFloodRiskFromComplaint,
@@ -9,7 +9,6 @@ import {
     getGarbageModelStatus,
     getRoadDamageModelStatus,
 } from "../services/floodRiskClient.js";
-import fs from "fs";
 import { upload } from "../middleware/upload.js";
 import { categoryLabel, categoryIcon, humanizeTime } from "../utils/helpers.js";
 
@@ -18,17 +17,19 @@ const router = express.Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function findReportByIdOrTracking(param) {
+    const include = [{ model: ReportImage, as: "images" }];
     if (UUID_RE.test(param)) {
-        return Report.findByPk(param);
+        return Report.findByPk(param, { include });
     }
-    return Report.findOne({ where: { tracking_id: param } });
+    return Report.findOne({ where: { tracking_id: param }, include });
 }
 
 function formatReportResponse(report) {
     const normalizeImageUrl = (value) => {
         if (!value) return null;
         if (value.startsWith("http://") || value.startsWith("https://")) return value;
-        return `http://127.0.0.1:8000${value.startsWith("/") ? value : `/${value}`}`;
+        const base = process.env.ML_SERVICE_URL || "http://127.0.0.1:8001";
+        return `${base}${value.startsWith("/") ? value : `/${value}`}`;
     };
 
     const reportImageUrl = normalizeImageUrl(report.image_url);
@@ -79,6 +80,11 @@ function formatReportResponse(report) {
         specific_details: report.specific_details,
         image_url: reportImageUrl,
         photo_url: reportImageUrl,
+        images: (report.images || []).map((img) => ({
+            id: img.id,
+            url: img.image_url,
+            ml_analysis: img.ml_analysis || null,
+        })),
         ml_analysis: report.ml_analysis || null,
         risk_signals: report.risk_signals || null,
         severity: displaySeverity,
@@ -119,6 +125,7 @@ router.get("/reports", async (req, res) => {
 
     const { count, rows } = await Report.findAndCountAll({
         where,
+        include: [{ model: ReportImage, as: "images" }],
         order: [["created_at", "DESC"]],
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -218,8 +225,7 @@ router.post("/predict-garbage", upload.single("file"), async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ error: "No image file uploaded" });
         }
-        const fileBuffer = fs.readFileSync(req.file.path);
-        const result = await predictGarbage(fileBuffer, req.file.originalname, req.file.mimetype);
+        const result = await predictGarbage(req.file.buffer, req.file.originalname, req.file.mimetype);
         res.json(result);
     } catch (err) {
         res.status(500).json({ error: "Failed to process image", detail: err.message });
@@ -236,9 +242,8 @@ router.post("/predict-road-damage", upload.single("file"), async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ error: "No image file uploaded" });
         }
-        const fileBuffer = fs.readFileSync(req.file.path);
         const category = req.body.category || "pothole";
-        const result = await predictRoadDamage(fileBuffer, req.file.originalname, req.file.mimetype, category);
+        const result = await predictRoadDamage(req.file.buffer, req.file.originalname, req.file.mimetype, category);
         res.json(result);
     } catch (err) {
         res.status(500).json({ error: "Failed to process image", detail: err.message });

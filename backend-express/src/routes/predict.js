@@ -1,23 +1,13 @@
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
 import multer from 'multer';
-import { fileURLToPath } from 'url';
-import { Report } from '../models/index.js';
-import { 
-  getFloodRiskFromComplaint, 
-  predictGarbage, 
+import { Report, ReportImage } from '../models/index.js';
+import {
+  getFloodRiskFromComplaint,
+  predictGarbage,
   predictRoadDamage
 } from '../services/floodRiskClient.js';
 import { triage } from '../services/triage.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadDir = path.resolve(__dirname, '../../uploads');
-
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+import { uploadBufferToSupabase } from '../services/supabaseStorage.js';
 
 const router = express.Router();
 
@@ -26,16 +16,15 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Main prediction endpoint that processes complaints
 router.post('/predict', upload.array('photos', 10), async (req, res) => {
   try {
-    const { 
-      category, 
-      district, 
-      city, 
-      area, 
-      latitude, 
-      longitude, 
+    const {
+      category,
+      district,
+      city,
+      area,
+      latitude,
+      longitude,
       raw_text,
       description,
       specific_details,
@@ -48,16 +37,28 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
     const uploadedFiles = req.files || [];
     const firstFile = uploadedFiles.length > 0 ? uploadedFiles[0] : null;
     const finalRawText = raw_text || description || specific_details || '';
+    const finalTrackingId = tracking_id || `CP-${Date.now()}`;
 
-    let savedImageUrls = [];
+    // ── Upload every photo straight to Supabase Storage ──────────────────
+    // Each gets a permanent public URL — no local disk, no JSON-stuffing.
+    const uploadedImages = [];
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const ext = (file.originalname && file.originalname.includes('.'))
+        ? file.originalname.substring(file.originalname.lastIndexOf('.'))
+        : '.jpg';
+      const destPath = `reports/${finalTrackingId}/${Date.now()}-${i}${ext}`;
 
-    if (uploadedFiles.length > 0) {
-      for (const file of uploadedFiles) {
-        const ext = path.extname(file.originalname || '.jpg') || '.jpg';
-        const savedFileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-        const filePath = path.join(uploadDir, savedFileName);
-        fs.writeFileSync(filePath, file.buffer);
-        savedImageUrls.push(`/uploads/${savedFileName}`);
+      const publicUrl = await uploadBufferToSupabase(
+        file.buffer,
+        destPath,
+        file.mimetype || 'image/jpeg'
+      );
+
+      if (publicUrl) {
+        uploadedImages.push({ url: publicUrl, isFirst: i === 0 });
+      } else {
+        console.warn(`Image ${i} failed to upload to Supabase Storage, skipping.`);
       }
     }
 
@@ -71,7 +72,6 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
     let aiAnalysis = null;
     let floodRisk = null;
 
-    // Get flood risk for flood-related complaints
     if (category === 'flood' && district) {
       try {
         floodRisk = await getFloodRiskFromComplaint({
@@ -85,22 +85,13 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
       }
     }
 
-    // Run AI image analysis if image is provided
+    // AI image analysis — still only the first photo, as agreed for now
     if (firstFile && (category === 'garbage' || category === 'road_damage')) {
       try {
         if (category === 'garbage') {
-          aiAnalysis = await predictGarbage(
-            firstFile.buffer,
-            firstFile.originalname,
-            firstFile.mimetype
-          );
+          aiAnalysis = await predictGarbage(firstFile.buffer, firstFile.originalname, firstFile.mimetype);
         } else if (category === 'road_damage') {
-          aiAnalysis = await predictRoadDamage(
-            firstFile.buffer,
-            firstFile.originalname,
-            firstFile.mimetype,
-            category
-          );
+          aiAnalysis = await predictRoadDamage(firstFile.buffer, firstFile.originalname, firstFile.mimetype, category);
         }
       } catch (error) {
         console.warn('AI image analysis failed:', error.message);
@@ -108,23 +99,19 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
       }
     }
 
-    // Enhance triage with AI results
     let enhancedTriage = { ...triageResult };
     let aiSeverity = enhancedTriage.severity;
     let aiPriorityScore = enhancedTriage.priorityScore;
 
     const deriveModelSeverity = (analysis, fallback = 'LOW') => {
       if (!analysis || analysis.error) return fallback;
-
       if (analysis.risk_level) return String(analysis.risk_level).toUpperCase();
-
       if (analysis.flood_probability != null) {
         const score = Number(analysis.flood_probability);
         if (score >= 0.7) return 'HIGH';
         if (score >= 0.35) return 'MEDIUM';
         return 'LOW';
       }
-
       const confidence = Number(analysis.confidence ?? 0);
       if (analysis.image_damage_score != null) {
         const score = Number(analysis.image_damage_score || 0);
@@ -132,7 +119,6 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
         if (score >= 1.5 || confidence >= 0.45) return 'MEDIUM';
         return 'LOW';
       }
-
       if (confidence >= 0.8) return 'HIGH';
       if (confidence >= 0.5) return 'MEDIUM';
       return 'LOW';
@@ -140,20 +126,16 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
 
     const deriveModelPriority = (analysis, fallback = 0.3) => {
       if (!analysis || analysis.error) return fallback;
-
       if (analysis.flood_probability != null) {
         return Number(Math.min(Math.max(Number(analysis.flood_probability), 0), 1).toFixed(2));
       }
-
       if (analysis.confidence != null) {
         return Number(Math.min(Math.max(Number(analysis.confidence), 0), 1).toFixed(2));
       }
-
       if (analysis.image_damage_score != null) {
         const score = Number(analysis.image_damage_score || 0);
         return Number(Math.min(Math.max(score / 10, 0.15), 0.95).toFixed(2));
       }
-
       return fallback;
     };
 
@@ -163,10 +145,8 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
     }
 
     if (aiAnalysis && !aiAnalysis.error) {
-      const modelSeverity = deriveModelSeverity(aiAnalysis, aiSeverity);
-      const modelPriority = deriveModelPriority(aiAnalysis, aiPriorityScore);
-      aiSeverity = modelSeverity;
-      aiPriorityScore = modelPriority;
+      aiSeverity = deriveModelSeverity(aiAnalysis, aiSeverity);
+      aiPriorityScore = deriveModelPriority(aiAnalysis, aiPriorityScore);
     }
 
     if (floodRisk && floodRisk.risk_level === 'HIGH') {
@@ -178,7 +158,10 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
     enhancedTriage.severity = aiSeverity;
     enhancedTriage.priorityScore = aiPriorityScore;
 
-    const finalImageUrl = savedImageUrls.length > 0 ? JSON.stringify(savedImageUrls) : null;
+    // Cover photo = first successfully uploaded image, as a plain URL
+    // (NOT JSON.stringify — image_url is a single text column)
+    const coverImageUrl = uploadedImages.length > 0 ? uploadedImages[0].url : null;
+
     const mlAnalysisPayload = aiAnalysis
       ? { type: category === 'garbage' ? 'garbage' : category === 'road_damage' ? 'road_damage' : 'flood', ...aiAnalysis }
       : floodRisk
@@ -186,12 +169,12 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
         : null;
 
     const savedReport = await Report.create({
-      tracking_id: tracking_id || `CP-${Date.now()}`,
+      tracking_id: finalTrackingId,
       name: name || 'Citizen',
       phone: phone || '',
       raw_text: finalRawText,
       specific_details: specific_details || finalRawText,
-      image_url: finalImageUrl,
+      image_url: coverImageUrl,
       latitude: latitude ? parseFloat(latitude) : null,
       longitude: longitude ? parseFloat(longitude) : null,
       district,
@@ -209,7 +192,19 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
       risk_signals: floodRisk ? { floodRisk } : null
     });
 
-    const responsePayload = {
+    // ── Every uploaded photo gets its own row, linked to this report ─────
+    if (uploadedImages.length > 0) {
+      await ReportImage.bulkCreate(
+        uploadedImages.map((img, index) => ({
+          report_id: savedReport.id,
+          image_url: img.url,
+          ml_analysis: img.isFirst ? mlAnalysisPayload : null,
+          sort_order: index,
+        }))
+      );
+    }
+
+    res.json({
       success: true,
       triage: enhancedTriage,
       floodRisk,
@@ -223,16 +218,15 @@ router.post('/predict', upload.array('photos', 10), async (req, res) => {
       escalation_confidence: enhancedTriage.escalationConfidence,
       severity_score: enhancedTriage.priorityScore,
       status: savedReport.status,
-      image_url: finalImageUrl
-    };
-
-    res.json(responsePayload);
+      image_url: coverImageUrl,
+      images: uploadedImages.map((img) => img.url),
+    });
 
   } catch (error) {
     console.error('Prediction error:', error);
-    res.status(500).json({ 
-      error: 'Prediction failed', 
-      detail: error.message 
+    res.status(500).json({
+      error: 'Prediction failed',
+      detail: error.message
     });
   }
 });
