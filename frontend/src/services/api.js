@@ -37,6 +37,14 @@ export const fetchReport = (reportId) =>
 export const syncReports = (identifiers) =>
   api.post("/reports/sync", { identifiers });
 
+// Track single complaint as guest (ID + Phone)
+export const trackGuestComplaint = (tracking_id, phone) =>
+  api.post("/reports/track-guest", { tracking_id, phone });
+
+// Fetch complaints by phone number (for OTP authenticated light accounts)
+export const fetchReportsByPhone = (phone) =>
+  api.get(`/reports/by-phone/${encodeURIComponent(phone)}`);
+
 // Delete a report
 export const deleteComplaint = (reportId) =>
   api.delete(`/reports/${reportId}`);

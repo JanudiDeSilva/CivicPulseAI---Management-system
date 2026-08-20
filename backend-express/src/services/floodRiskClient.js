@@ -7,13 +7,33 @@ const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8001";
  * (district, place_name, GPS). The Python side fills in the rest from the
  * district lookup table + live rainfall.
  */
-export async function getFloodRiskFromComplaint({ district, place_name, latitude, longitude }) {
-  if (!district) return null; // model needs at least a district to look anything up
-
+export async function getFloodRiskFromComplaint({
+  district,
+  place_name,
+  latitude,
+  longitude,
+  problem_type,
+  severity_waterlogging,
+  water_status,
+  duration,
+  impact,
+  description
+}) {
   try {
     const { data } = await axios.post(
       `${ML_SERVICE_URL}/predict-from-complaint`,
-      { district, place_name, latitude, longitude },
+      {
+        district,
+        place_name,
+        latitude,
+        longitude,
+        problem_type,
+        severity_waterlogging,
+        water_status,
+        duration,
+        impact,
+        description
+      },
       { timeout: 6000 }
     );
 
@@ -22,10 +42,10 @@ export async function getFloodRiskFromComplaint({ district, place_name, latitude
       return null;
     }
 
-    return data; // { flood_occurrence, flood_probability, risk_level, confidence }
+    return data;
   } catch (err) {
     console.error("ML service unreachable:", err.message);
-    return null; // caller must handle a null result gracefully
+    return null;
   }
 }
 

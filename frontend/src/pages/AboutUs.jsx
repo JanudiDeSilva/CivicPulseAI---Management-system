@@ -63,12 +63,12 @@ const CATEGORIES = [
   {
     icon: "🌊",
     name: {
-      en: "Flood & Drainage",
-      si: "ගංවතුර සහ ජල බැස්සීම"
+      en: "Drainage & Waterlogging",
+      si: "කාණු සහ ජල බැසීමේ ගැටළු"
     },
     desc: {
-      en: "Blocked drains, standing water, flood risk",
-      si: "අවහිර ජල කාණු, සිටින ජලය, ගංවතුර අවදානම"
+      en: "Blocked storm drains, road waterlogging, stagnant water",
+      si: "අවහිර ජල කාණු, මාර්ග ජලයෙන් යටවීම, රැඳී ඇති ජලය"
     },
     code: "CAT-01",
   },

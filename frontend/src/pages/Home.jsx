@@ -19,8 +19,8 @@ const CATEGORIES = [
     titleKey: "cat_flood",
     icon: "🌊",
     image: floodImg,
-    desc_en: "Report flash flooding, overflowing canals, and clogged drainage systems.",
-    desc_si: "ආකස්මික ගංවතුර, ඉදිරිකරණ ඇළ ගලා යාම සහ අවහිර ජල කාණු පද්ධති වාර්තා කරන්න.",
+    desc_en: "Report urban waterlogging, overflowing canals, and clogged storm drainage systems.",
+    desc_si: "නාගරික ජල බැසීමේ ගැටළු, ඇළ මාර්ග පිරී යාම සහ අවහිර කාණු පද්ධති වාර්තා කරන්න.",
     badge: "badge-flood",
   },
   {
@@ -110,11 +110,11 @@ export default function Home() {
           </p>
 
           <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-            <Link to={session ? "/complaint?category=flood" : "/login"} className="btn btn-primary" style={{ padding: "14px 32px", fontSize: "1.05rem" }}>
+            <Link to="/complaint?category=flood" className="btn btn-primary" style={{ padding: "14px 32px", fontSize: "1.05rem" }}>
               📢 {t("home_report_btn")}
             </Link>
-            <Link to="/dashboard" className="btn btn-secondary" style={{ padding: "14px 28px", fontSize: "1.05rem" }}>
-              📊 {t("home_dashboard_btn")}
+            <Link to="/my-portal" className="btn btn-secondary" style={{ padding: "14px 28px", fontSize: "1.05rem" }}>
+              🔍 Track Complaint
             </Link>
           </div>
         </section>
@@ -241,7 +241,7 @@ export default function Home() {
               </div>
               <div style={{ padding: "0 20px 20px 20px" }}>
                 <Link
-                  to={session ? `/complaint?category=${cat.id}` : "/login"}
+                  to={`/complaint?category=${cat.id}`}
                   className="btn btn-secondary"
                   style={{ fontSize: "0.83rem", padding: "8px 12px", width: "100%", justifyContent: "space-between" }}
                 >

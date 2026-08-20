@@ -112,6 +112,27 @@ function formatReportResponse(report) {
         nearest_evac_km: report.nearest_evac_km,
         submitted_at: humanizeTime(report.created_at),
         created_at: report.created_at,
+        resolved_at: report.resolved_at || null,
+        resolution_duration_ms: (() => {
+            if (report.status !== "Resolved" && report.status !== "Closed") return null;
+            const created = report.created_at ? new Date(report.created_at).getTime() : null;
+            const resolved = report.resolved_at ? new Date(report.resolved_at).getTime() : (report.updated_at ? new Date(report.updated_at).getTime() : null);
+            if (created && resolved && resolved >= created) return resolved - created;
+            return null;
+        })(),
+        resolution_time_display: (() => {
+            if (report.status !== "Resolved" && report.status !== "Closed") return null;
+            const created = report.created_at ? new Date(report.created_at).getTime() : null;
+            const resolved = report.resolved_at ? new Date(report.resolved_at).getTime() : (report.updated_at ? new Date(report.updated_at).getTime() : null);
+            if (created && resolved && resolved >= created) {
+                const diff = resolved - created;
+                const hours = diff / 3600000;
+                if (hours < 1) return `${Math.max(Math.round(diff / 60000), 1)}m`;
+                if (hours < 24) return `${hours.toFixed(1)}h`;
+                return `${(hours / 24).toFixed(1)}d`;
+            }
+            return null;
+        })(),
     };
 }
 
@@ -152,6 +173,51 @@ router.post("/reports/sync", async (req, res) => {
     res.json({ reports });
 });
 
+// ─── POST /reports/track-guest ──────────────────────────────────────────────
+router.post("/reports/track-guest", async (req, res) => {
+    const { tracking_id, phone } = req.body;
+    if (!tracking_id || !phone) {
+        return res.status(400).json({ detail: "Both Complaint ID and Mobile Number are required to track." });
+    }
+
+    const report = await findReportByIdOrTracking(String(tracking_id).trim());
+    if (!report) {
+        return res.status(404).json({ detail: "No complaint found with this Complaint ID." });
+    }
+
+    const cleanReqPhone = String(phone).replace(/\D/g, "");
+    const cleanRepPhone = String(report.phone || "").replace(/\D/g, "");
+
+    const phoneMatches = cleanReqPhone && cleanRepPhone && (
+        cleanRepPhone.endsWith(cleanReqPhone) ||
+        cleanReqPhone.endsWith(cleanRepPhone) ||
+        cleanReqPhone.slice(-7) === cleanRepPhone.slice(-7)
+    );
+
+    if (!phoneMatches) {
+        return res.status(403).json({ detail: "The mobile number provided does not match the registered contact for this complaint." });
+    }
+
+    res.json({ report: formatReportResponse(report) });
+});
+
+// ─── GET /reports/by-phone/:phone ───────────────────────────────────────────
+router.get("/reports/by-phone/:phone", async (req, res) => {
+    const rawPhone = req.params.phone;
+    const cleanPhone = String(rawPhone).replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length < 5) {
+        return res.status(400).json({ detail: "Valid phone number required." });
+    }
+
+    const allReports = await Report.findAll({ order: [["created_at", "DESC"]] });
+    const matched = allReports.filter(r => {
+        const repClean = String(r.phone || "").replace(/\D/g, "");
+        return repClean && (repClean.endsWith(cleanPhone) || cleanPhone.endsWith(repClean) || cleanPhone.slice(-7) === repClean.slice(-7));
+    });
+
+    res.json({ reports: matched.map(r => formatReportResponse(r)) });
+});
+
 // ─── GET /reports/:id ───────────────────────────────────────────────────────
 router.get("/reports/:id", async (req, res) => {
     const report = await findReportByIdOrTracking(req.params.id);
@@ -181,11 +247,17 @@ router.patch("/reports/:id/status", async (req, res) => {
     if (!report) return res.status(404).json({ detail: "Report not found" });
 
     report.status = status;
+    if (status === "Resolved" || status === "Closed") {
+        if (!report.resolved_at) report.resolved_at = new Date();
+    } else {
+        report.resolved_at = null;
+    }
     await report.save();
     res.json({
         id: report.id,
         tracking_id: report.tracking_id,
         status: report.status,
+        resolved_at: report.resolved_at || null,
         message: "Status updated",
     });
 });
