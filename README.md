@@ -26,7 +26,7 @@ graph TD
     Express -->|Prediction requests| ML
     Express -->|Report image uploads| Storage
     ML -->|Recent rainfall data| Weather
-
+```
 ### 1. 💻 React Frontend (`/frontend`)
 
 - **Core:** React 19, Vite, and React Router
