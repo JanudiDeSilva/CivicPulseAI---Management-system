@@ -15,13 +15,13 @@ import communityImg from "../assets/community_help.png";
 
 const CATEGORIES = [
   {
-    id: "flood",
-    titleKey: "cat_flood",
-    icon: "🌊",
-    image: floodImg,
-    desc_en: "Report urban waterlogging, overflowing canals, and clogged storm drainage systems.",
-    desc_si: "නාගරික ජල බැසීමේ ගැටළු, ඇළ මාර්ග පිරී යාම සහ අවහිර කාණු පද්ධති වාර්තා කරන්න.",
-    badge: "badge-flood",
+    id: "garbage",
+    titleKey: "cat_garbage",
+    icon: "🗑️",
+    image: garbageImg,
+    desc_en: "Report illegal waste dumping, missed collections, and unhygienic waste piles.",
+    desc_si: "නීති විරෝධී කසළ ඉවත් කිරීම, මඟ හැරුණු එකතු කිරීම් සහ අනාරෝග්‍යකර කසළ ගොඩ වාර්තා කරන්න.",
+    badge: "badge-garbage",
   },
   {
     id: "road_damage",
@@ -31,15 +31,6 @@ const CATEGORIES = [
     desc_en: "Log hazardous potholes, damaged asphalt, or caved municipal roads.",
     desc_si: "භයානක ගිලෙන ස්ථාන, හානි වූ ඇස්ෆල්ට් හෝ ගිලූ නාගරික මාර්ග ලෝගු කරන්න.",
     badge: "badge-road_damage",
-  },
-  {
-    id: "garbage",
-    titleKey: "cat_garbage",
-    icon: "🗑️",
-    image: garbageImg,
-    desc_en: "Report illegal waste dumping, missed collections, and unhygienic waste piles.",
-    desc_si: "නීති විරෝධී කසළ ඉවත් කිරීම, මඟ හැරුණු එකතු කිරීම් සහ අනාරෝග්‍යකර කසළ ගොඩ වාර්තා කරන්න.",
-    badge: "badge-garbage",
   },
   {
     id: "power_failure",
@@ -58,7 +49,16 @@ const CATEGORIES = [
     desc_en: "Report non-functional streetlights and dark hazards in residential neighborhoods.",
     desc_si: "ක්‍රියා නොකරන වීදි ලාම්පු සහ නේවාසික ප්‍රදේශවල අඳුරු භයානකතා වාර්තා කරන්න.",
     badge: "badge-street_light",
-  }
+  },
+  {
+    id: "flood",
+    titleKey: "cat_flood",
+    icon: "🌊",
+    image: floodImg,
+    desc_en: "Report urban waterlogging, overflowing canals, and clogged storm drainage systems.",
+    desc_si: "නාගරික ජල බැසීමේ ගැටළු, ඇළ මාර්ග පිරී යාම සහ අවහිර කාණු පද්ධති වාර්තා කරන්න.",
+    badge: "badge-flood",
+  },
 ];
 
 export default function Home() {
