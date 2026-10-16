@@ -1,4 +1,3 @@
-```markdown
 # 🚨 CivicPulse AI — Civic Issue Reporting and Management
 
 An AI-assisted civic-reporting platform that enables citizens to submit, track, and manage local issues. CivicPulse AI combines location-aware complaint submission, image-based analysis, rule-based triage, and an administrative dashboard to help communities respond to civic problems more efficiently.
@@ -13,13 +12,20 @@ CivicPulse AI follows a three-service architecture consisting of a React fronten
 
 ```mermaid
 graph TD
-    Browser[React + Vite Frontend<br/>Port 5173] -->|REST API| Express[Express Backend<br/>Port 8000]
-    Browser -->|Authentication and optional direct ML calls| Supabase[Supabase Auth and Storage]
-    Express -->|Sequelize ORM| PostgreSQL[(PostgreSQL Database)]
-    Express -->|Prediction requests| ML[FastAPI ML Service<br/>Port 8001]
-    Express -->|Report image uploads| Storage[Supabase Storage]
-    ML -->|Recent rainfall data| Weather[Open-Meteo API]
-```
+    Browser["React + Vite Frontend<br/>Port 5173"]
+    Express["Express Backend<br/>Port 8000"]
+    Supabase["Supabase Auth and Storage"]
+    PostgreSQL[("PostgreSQL Database")]
+    ML["FastAPI ML Service<br/>Port 8001"]
+    Storage["Supabase Storage"]
+    Weather["Open-Meteo API"]
+
+    Browser -->|REST API| Express
+    Browser -->|Authentication and optional direct ML calls| Supabase
+    Express -->|Sequelize ORM| PostgreSQL
+    Express -->|Prediction requests| ML
+    Express -->|Report image uploads| Storage
+    ML -->|Recent rainfall data| Weather
 
 ### 1. 💻 React Frontend (`/frontend`)
 
